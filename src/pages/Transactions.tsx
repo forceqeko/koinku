@@ -1,0 +1,703 @@
+import { useState, useMemo, useEffect, useRef } from 'react';
+import TransactionModal from '../components/TransactionModal';
+import { Plus, ChevronDown, ArrowUp, ArrowDown, ArrowUpDown, Calendar } from 'lucide-react';
+import clsx from 'clsx';
+import { format } from 'date-fns';
+import { id } from 'date-fns/locale';
+import { useData } from '../context/DataContext';
+import { useAuth } from '../context/AuthContext';
+import { supabase } from '../lib/supabase';
+import { toast } from '../components/Toast';
+import { fmt } from '../lib/utils';
+import type { Transaction, Account, Wishlist, ExpenseCategory, ExpensePurpose } from '../types';
+import { validateTransaction } from '../types';
+
+type Tab = 'income' | 'expense' | 'saving' | 'transfer' | 'bill';
+type SortKey = 'date' | 'description' | 'account' | 'admin_fee' | 'amount';
+type SortDirection = 'asc' | 'desc' | null;
+
+// Extended transaction type for UI rendering (includes admin fee virtual rows)
+interface TransactionView extends Transaction {
+  original_tx?: Transaction;
+}
+
+const tabs: { id: Tab; label: string }[] = [
+  { id: 'income', label: 'Pemasukan' },
+  { id: 'expense', label: 'Pengeluaran' },
+  { id: 'saving', label: 'Tabungan' },
+  { id: 'transfer', label: 'Transfer' },
+  { id: 'bill', label: 'Tagihan' },
+];
+
+export default function Transactions() {
+  const [activeTab, setActiveTab] = useState<Tab>('expense');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingTx, setEditingTx] = useState<Transaction | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection }>({ 
+    key: 'date', 
+    direction: 'desc' 
+  });
+
+  const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
+  const [isYearPickerOpen, setIsYearPickerOpen] = useState(false);
+  const monthPickerRef = useRef<HTMLDivElement>(null);
+  const yearPickerRef = useRef<HTMLDivElement>(null);
+
+  const { transactions, accounts, wishlists, categories, purposes, billPurposes, refresh, loading } = useData();
+  const { user } = useAuth();
+
+  const months = [
+    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+  ];
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (monthPickerRef.current && !monthPickerRef.current.contains(event.target as Node)) {
+        setIsMonthPickerOpen(false);
+      }
+      if (yearPickerRef.current && !yearPickerRef.current.contains(event.target as Node)) {
+        setIsYearPickerOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const filtered = useMemo<TransactionView[]>(() => {
+    return transactions.flatMap(t => {
+      const d = new Date(t.date);
+      const inSelectedPeriod = d.getMonth() === selectedMonth && d.getFullYear() === selectedYear;
+      
+      if (!inSelectedPeriod) return [];
+
+      // If active tab matches transaction type
+      if (t.type === activeTab) return [t as TransactionView];
+
+      // Special Case: In 'expense' tab, also show admin fees from transfers/savings
+      if (activeTab === 'expense' && (t.type === 'transfer' || t.type === 'saving') && Number(t.admin_fee) > 0) {
+        const catAdmin = categories.find((c: ExpenseCategory) => c.name === 'Kebutuhan Lainnya');
+        const purAdmin = purposes.find((p: ExpensePurpose) => p.name === 'Admin');
+
+        return [{
+          ...t,
+          id: `${t.id}_fee`, // Unique ID for virtual row
+          amount: t.admin_fee || 0,
+          description: `Biaya Admin: ${t.description}`,
+          type: 'expense' as const, // Changed from 'expense_fee' to valid TransactionType
+          category_id: catAdmin?.id,
+          purpose_id: purAdmin?.id,
+          original_tx: t // Keep reference for modal opening if needed
+        }];
+      }
+
+      return [];
+    });
+  }, [transactions, selectedMonth, selectedYear, activeTab]);
+
+  // Compute available years from transaction data
+  const availableYears = useMemo(() => {
+    const years = new Set<number>();
+    transactions.forEach(t => {
+      const y = new Date(t.date).getFullYear();
+      years.add(y);
+    });
+    // Always include the current year
+    years.add(new Date().getFullYear());
+    return Array.from(years).sort((a, b) => b - a);
+  }, [transactions]);
+
+  const sortedData = useMemo<TransactionView[]>(() => {
+    if (!sortConfig.key || !sortConfig.direction) return filtered;
+
+    return [...filtered].sort((a, b) => {
+      let aVal: string | number;
+      let bVal: string | number;
+
+      switch (sortConfig.key) {
+        case 'date':
+          aVal = new Date(a.date).getTime();
+          bVal = new Date(b.date).getTime();
+          break;
+        case 'description': {
+          const wishlistA = wishlists.find((w: Wishlist) => w.id === a.wishlist_id);
+          const wishlistB = wishlists.find((w: Wishlist) => w.id === b.wishlist_id);
+          aVal = (activeTab === 'saving' ? (wishlistA?.name || a.description) : a.description).toLowerCase();
+          bVal = (activeTab === 'saving' ? (wishlistB?.name || b.description) : b.description).toLowerCase();
+          break;
+        }
+        case 'account': {
+          const fromA = accounts.find((acc: Account) => acc.id === a.from_account_id)?.name || '';
+          const toA = accounts.find((acc: Account) => acc.id === a.to_account_id)?.name || '';
+          const fromB = accounts.find((acc: Account) => acc.id === b.from_account_id)?.name || '';
+          const toB = accounts.find((acc: Account) => acc.id === b.to_account_id)?.name || '';
+          
+          if (activeTab === 'transfer' || activeTab === 'saving' || activeTab === 'bill') {
+            aVal = fromA.toLowerCase();
+            bVal = fromB.toLowerCase();
+          } else if (activeTab === 'income') {
+            aVal = toA.toLowerCase();
+            bVal = toB.toLowerCase();
+          } else {
+            aVal = fromA.toLowerCase();
+            bVal = fromB.toLowerCase();
+          }
+          break;
+        }
+        case 'admin_fee':
+          aVal = Number(a.admin_fee || 0);
+          bVal = Number(b.admin_fee || 0);
+          break;
+        case 'amount':
+          aVal = Number(a.amount);
+          bVal = Number(b.amount);
+          break;
+        default:
+          return 0;
+      }
+
+      if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [filtered, sortConfig, accounts, wishlists, activeTab]);
+
+  const handleSort = (key: SortKey) => {
+    setSortConfig(current => {
+      if (current.key === key) {
+        if (current.direction === 'asc') return { key, direction: 'desc' };
+        if (current.direction === 'desc') return { key, direction: null };
+        return { key, direction: 'asc' };
+      }
+      return { key, direction: 'asc' };
+    });
+  };
+
+  const SortHeader = ({ label, sortKey, align = 'left' }: { label: string, sortKey: SortKey, align?: 'left' | 'right' }) => {
+    const isActive = sortConfig.key === sortKey;
+    const direction = sortConfig.direction;
+
+    return (
+      <th 
+        className={clsx(
+          "px-5 py-3.5 font-semibold text-text-muted cursor-pointer hover:bg-surface-hover transition-colors group",
+          align === 'right' && "text-right"
+        )}
+        onClick={() => handleSort(sortKey)}
+      >
+        <div className={clsx("flex items-center gap-1.5", align === 'right' && "justify-end")}>
+          <span>{label}</span>
+          <div className="flex flex-col text-text-muted/30 group-hover:text-text-muted transition-colors text-[10px]">
+            {isActive ? (
+              direction === 'asc' ? <ArrowUp className="w-3 h-3 text-accent" /> :
+              direction === 'desc' ? <ArrowDown className="w-3 h-3 text-accent" /> :
+              <ArrowUpDown className="w-3 h-3" />
+            ) : (
+              <ArrowUpDown className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+            )}
+          </div>
+        </div>
+      </th>
+    );
+  };
+
+  // ── Helper: Atomically adjust account balance via RPC ──
+  const adjustBalance = async (accountId: string, delta: number) => {
+    const { error } = await supabase.rpc('adjust_account_balance', {
+      account_id: accountId,
+      delta,
+    });
+    if (error) throw new Error('Sinkronisasi saldo gagal: ' + error.message);
+  };
+
+  const adjustWishlist = async (wishlistId: string, delta: number) => {
+    const { error } = await supabase.rpc('adjust_wishlist_amount', {
+      wl_id: wishlistId,
+      delta,
+    });
+    if (error) throw new Error('Sinkronisasi wishlist gagal: ' + error.message);
+  };
+
+  // ── Helper: Apply balance changes for a transaction (atomic) ──
+  const applyBalanceChanges = async (tx: Transaction, direction: 'apply' | 'reverse') => {
+    if (!user) return;
+    const mult = direction === 'apply' ? 1 : -1;
+    const amt = Number(tx.amount) * mult;
+    const fee = Number(tx.admin_fee || 0) * mult;
+
+    if (tx.type === 'income') {
+      if (!tx.to_account_id) throw new Error('Akun tujuan wajib dipilih untuk pemasukan');
+      await adjustBalance(tx.to_account_id, amt);
+    } 
+    else if (tx.type === 'expense' || tx.type === 'bill') {
+      if (!tx.from_account_id) throw new Error('Akun sumber wajib dipilih untuk pengeluaran');
+      await adjustBalance(tx.from_account_id, -amt);
+    }
+    else if (tx.type === 'transfer' || tx.type === 'saving') {
+      if (!tx.from_account_id) throw new Error('Akun sumber wajib dipilih');
+      if (!tx.to_account_id) throw new Error('Akun tujuan wajib dipilih');
+      if (tx.from_account_id === tx.to_account_id) throw new Error('Akun sumber dan tujuan tidak boleh sama');
+      await adjustBalance(tx.from_account_id, -(amt + fee));
+      await adjustBalance(tx.to_account_id, amt);
+    }
+
+    if (tx.type === 'saving' && tx.wishlist_id) {
+      await adjustWishlist(tx.wishlist_id, amt);
+    }
+  };
+
+  const handleAddTransaction = async (txData: Partial<Transaction>) => {
+    let insertedTxId: string | null = null;
+    
+    try {
+      // Point 14: Client-side validation before sending to server
+      const validation = validateTransaction(txData);
+      if (!validation.isValid) {
+        const errorMsg = validation.errors.map(e => e.message).join(', ');
+        toast.error('Validasi gagal: ' + errorMsg);
+        return;
+      }
+
+      // Insert transaction
+      const { data: insertedData, error: insertError } = await supabase
+        .from('transactions')
+        .insert([{ ...txData, user_id: user?.id }])
+        .select('id')
+        .single();
+      
+      if (insertError) throw insertError;
+      insertedTxId = insertedData?.id;
+
+      // Apply balance changes with rollback on failure
+      try {
+        await applyBalanceChanges(txData as Transaction, 'apply');
+      } catch (balanceError: any) {
+        // Rollback: Delete the inserted transaction
+        if (insertedTxId) {
+          await supabase.from('transactions').delete().eq('id', insertedTxId);
+        }
+        throw balanceError;
+      }
+
+      // Auto-create expense for admin fee
+      if ((txData.type === 'transfer' || txData.type === 'saving') && Number(txData.admin_fee) > 0) {
+        const { data: cats } = await supabase.from('expense_categories').select('id').eq('name', 'Kebutuhan Lainnya').limit(1);
+        const { data: purps } = await supabase.from('expense_purposes').select('id').eq('name', 'Admin').limit(1);
+        if (cats?.length && purps?.length) {
+          await supabase.from('transactions').insert([{
+            user_id: user?.id, date: txData.date, type: 'expense',
+            description: `Biaya Admin - ${txData.description}`,
+            amount: Number(txData.admin_fee),
+            from_account_id: txData.from_account_id,
+            category_id: cats[0].id, purpose_id: purps[0].id,
+          }]);
+        }
+      }
+
+      refresh();
+      toast.success('Transaksi berhasil ditambahkan!');
+    } catch (err: any) {
+      // Rollback if transaction was inserted but something else failed
+      if (insertedTxId) {
+        await supabase.from('transactions').delete().eq('id', insertedTxId);
+        await refresh();
+      }
+      toast.error('Gagal: ' + err.message);
+    }
+  };
+
+  const handleEditTransaction = async (id: string, txData: Partial<Transaction>) => {
+    let updateFailed = false;
+    const oldTx = transactions.find(t => t.id === id);
+    if (!oldTx) return;
+
+    try {
+      // Point 14: Client-side validation before sending to server
+      const validation = validateTransaction(txData);
+      if (!validation.isValid) {
+        const errorMsg = validation.errors.map(e => e.message).join(', ');
+        toast.error('Validasi gagal: ' + errorMsg);
+        return;
+      }
+
+      // 1. Revert old transaction balances
+      await applyBalanceChanges(oldTx, 'reverse');
+
+      // 2. Update transaction in DB
+      const { error } = await supabase.from('transactions').update(txData).eq('id', id);
+      if (error) {
+        updateFailed = true;
+        throw error;
+      }
+
+      // 3. Apply new transaction balances with rollback on failure
+      try {
+        await applyBalanceChanges({ ...oldTx, ...txData } as Transaction, 'apply');
+      } catch (balanceError: any) {
+        // Rollback: Restore old transaction data
+        await supabase.from('transactions').update(oldTx).eq('id', id);
+        await applyBalanceChanges(oldTx, 'apply'); // Re-apply old balances
+        throw balanceError;
+      }
+
+      refresh();
+      toast.success('Transaksi berhasil diperbarui!');
+    } catch (err: any) {
+      if (!updateFailed) {
+        // Try to restore balances if update failed but revert succeeded
+        await applyBalanceChanges(oldTx, 'apply');
+      }
+      toast.error('Gagal: ' + err.message);
+    }
+  };
+
+  const handleDeleteTransaction = async (tx: Transaction) => {
+    try {
+      // Point 16: Use soft delete instead of hard delete
+      const { error } = await supabase.rpc('soft_delete_transaction', {
+        tx_id: tx.id
+      });
+      if (error) {
+        throw error;
+      }
+
+      // Reverse balance changes with rollback on failure
+      try {
+        await applyBalanceChanges(tx, 'reverse');
+      } catch (balanceError: any) {
+        // Rollback: Restore the transaction
+        await supabase.from('transactions').update({ deleted_at: null }).eq('id', tx.id);
+        throw balanceError;
+      }
+
+      refresh();
+      toast.success('Transaksi berhasil dihapus.');
+    } catch (err: any) {
+      toast.error('Gagal: ' + err.message);
+    }
+  };
+
+  const openEditModal = (tx: Transaction) => {
+    setEditingTx(tx);
+    setIsModalOpen(true);
+  };
+
+  return (
+    <div className="p-5 md:p-8 max-w-[1200px] mx-auto animate-fade-in pb-24 md:pb-8">
+      <div className="space-y-6">
+        {/* top controls: month selector, tabs, & add button */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center justify-between gap-3 w-full md:w-auto md:order-1">
+            <div className="relative" ref={monthPickerRef}>
+              <button 
+                onClick={() => setIsMonthPickerOpen(!isMonthPickerOpen)}
+                className="bg-surface border border-line px-5 py-2.5 rounded-2xl flex items-center gap-3 shadow-sm hover:border-accent/40 transition-all font-bold text-[13px] text-text-primary min-w-[170px] md:min-w-[180px] justify-between group h-[46px]"
+              >
+                 <div className="flex items-center gap-2.5">
+                    <div className="w-7 h-7 rounded-lg bg-accent/10 flex items-center justify-center">
+                      <Calendar className="w-4 h-4 text-accent" />
+                    </div>
+                    <span className="truncate">{months[selectedMonth]}</span>
+                 </div>
+                 <ChevronDown className={clsx("w-4 h-4 text-text-muted transition-transform duration-300", isMonthPickerOpen && "rotate-180")} />
+              </button>
+              
+              {isMonthPickerOpen && (
+                <div className="absolute top-full left-0 mt-2 z-30 w-[220px] bg-surface border border-line rounded-2xl shadow-2xl overflow-hidden animate-scale-in p-1">
+                  <div className="grid grid-cols-1 max-h-[300px] overflow-y-auto custom-scrollbar">
+                    {months.map((m, idx) => (
+                      <button 
+                        key={m} 
+                        onClick={() => { setSelectedMonth(idx); setIsMonthPickerOpen(false); }}
+                        className={clsx(
+                          "w-full px-4 py-2.5 rounded-xl text-left text-[13px] transition-all flex items-center justify-between group",
+                          selectedMonth === idx 
+                            ? "bg-accent text-white font-bold" 
+                            : "text-text-primary hoven:bg-surface-hover hover:text-accent font-medium"
+                        )}
+                      >
+                        {m}
+                        {selectedMonth === idx && <div className="w-1.5 h-1.5 rounded-full bg-white opacity-80" />}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Year Picker */}
+            <div className="relative" ref={yearPickerRef}>
+              <button 
+                onClick={() => setIsYearPickerOpen(!isYearPickerOpen)}
+                className="bg-surface border border-line px-5 py-2.5 rounded-2xl flex items-center gap-3 shadow-sm hover:border-accent/40 transition-all font-bold text-[13px] text-text-primary justify-between group h-[46px]"
+              >
+                <span>{selectedYear}</span>
+                <ChevronDown className={clsx("w-4 h-4 text-text-muted transition-transform duration-300", isYearPickerOpen && "rotate-180")} />
+              </button>
+
+              {isYearPickerOpen && (
+                <div className="absolute top-full left-0 mt-2 z-30 w-[140px] bg-surface border border-line rounded-2xl shadow-2xl overflow-hidden animate-scale-in p-1">
+                  <div className="grid grid-cols-1 max-h-[200px] overflow-y-auto custom-scrollbar">
+                    {availableYears.map(y => (
+                      <button 
+                        key={y} 
+                        onClick={() => { setSelectedYear(y); setIsYearPickerOpen(false); }}
+                        className={clsx(
+                          "w-full px-4 py-2.5 rounded-xl text-left text-[13px] transition-all flex items-center justify-between group",
+                          selectedYear === y 
+                            ? "bg-accent text-white font-bold" 
+                            : "text-text-primary hover:bg-surface-hover hover:text-accent font-medium"
+                        )}
+                      >
+                        {y}
+                        {selectedYear === y && <div className="w-1.5 h-1.5 rounded-full bg-white opacity-80" />}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <button 
+              onClick={() => { setEditingTx(null); setIsModalOpen(true); }}
+              className="btn btn-primary shadow-lg shadow-accent/20 flex items-center justify-center gap-2 h-[46px] px-4 rounded-2xl active:scale-95 transition-all shrink-0 md:hidden"
+            >
+              <Plus className="w-4 h-4" />
+              <span className="font-bold text-[13px]">Tambah</span>
+            </button>
+          </div>
+
+          <div className="flex bg-surface-alt/10 dark:bg-surface-alt/40 p-1 rounded-2xl border border-line w-full md:w-fit overflow-x-auto no-scrollbar gap-1 md:order-2">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={clsx(
+                  'px-2 md:px-5 py-2 rounded-xl text-[11px] md:text-[12px] font-bold transition-all whitespace-nowrap uppercase tracking-wider flex-1 md:flex-none text-center',
+                  activeTab === tab.id
+                    ? 'bg-accent text-bg shadow-md shadow-accent/10 dark:shadow-accent/5'
+                    : 'text-text-muted hover:text-text-primary hover:bg-surface-hover'
+                )}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          <button 
+            onClick={() => { setEditingTx(null); setIsModalOpen(true); }}
+            className="hidden md:flex btn btn-primary shadow-lg shadow-accent/20 items-center justify-center gap-2 h-[46px] px-5 rounded-2xl active:scale-95 transition-all shrink-0 md:order-3"
+          >
+            <Plus className="w-4 h-4" />
+            <span className="font-bold text-[14px]">Tambah Transaksi</span>
+          </button>
+        </div>
+
+        {/* Table (Desktop) / Cards (Mobile) */}
+        {loading ? (
+          <div className="card shadow-sm border-line bg-surface p-5 space-y-4">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="flex items-center gap-4">
+                <div className="skeleton w-20 h-4" />
+                <div className="skeleton flex-1 h-4" />
+                <div className="skeleton w-24 h-4" />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <>
+            {/* Mobile Card List */}
+            <div className="md:hidden space-y-2.5">
+              {sortedData.length === 0 ? (
+                <div className="card p-8 text-center text-text-muted text-sm font-medium">
+                  Belum ada transaksi di tab ini.
+                </div>
+              ) : (
+                sortedData.map(tx => {
+                  const fromAcct = accounts.find((a: Account) => a.id === tx.from_account_id);
+                  const toAcct = accounts.find((a: Account) => a.id === tx.to_account_id);
+                  const wishlist = wishlists.find((w: Wishlist) => w.id === tx.wishlist_id);
+                  const category = categories.find((c: ExpenseCategory) => c.id === tx.category_id);
+                  const purpose = purposes.find((p: ExpensePurpose) => p.id === tx.purpose_id);
+                  const billPurpose = billPurposes.find((b: any) => b.id === tx.bill_purpose_id);
+
+                  return (
+                    <div 
+                      key={tx.id} 
+                      onClick={() => openEditModal(tx.original_tx || tx)} 
+                      className="card p-4 shadow-sm border-line bg-surface active:bg-surface-hover transition-colors cursor-pointer"
+                    >
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="flex-1 min-w-0 mr-3">
+                          <p className="text-[13px] font-bold text-text-primary truncate">
+                            {activeTab === 'saving' ? (wishlist?.name || tx.description) : tx.description}
+                          </p>
+                          <p className="text-[11px] text-text-muted font-medium mt-0.5">
+                            {format(new Date(tx.date), 'dd MMM yyyy', { locale: id })}
+                          </p>
+                        </div>
+                        <span className={clsx("text-[14px] font-bold whitespace-nowrap", activeTab === 'income' ? "text-success" : "text-text-primary")}>
+                          {activeTab === 'income' ? '+' : activeTab === 'expense' || activeTab === 'bill' ? '-' : ''}{fmt(Number(tx.amount))}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {activeTab === 'expense' && category && (
+                          <span className="bg-surface-alt/50 px-2 py-0.5 rounded-md text-text-secondary font-medium border border-line/50 text-[10px]">
+                            {category.name}
+                          </span>
+                        )}
+                        {activeTab === 'expense' && purpose && (
+                          <span className="bg-accent/5 px-2 py-0.5 rounded-md text-accent font-semibold border border-accent/10 text-[10px]">
+                            {purpose.name}
+                          </span>
+                        )}
+                        {activeTab === 'bill' && billPurpose && (
+                          <span className="bg-warning/10 px-2 py-0.5 rounded-md text-warning font-semibold border border-warning/20 text-[10px]">
+                            {billPurpose.name}
+                          </span>
+                        )}
+                        {(activeTab === 'transfer' || activeTab === 'saving') && (
+                          <span className="text-[10px] text-text-muted font-medium">
+                            {fromAcct?.name || '-'} ➔ {toAcct?.name || '-'}
+                          </span>
+                        )}
+                        {(activeTab === 'income' || activeTab === 'expense' || activeTab === 'bill') && (
+                          <span className="bg-surface-alt px-2 py-0.5 rounded-md text-[10px] font-medium text-text-muted">
+                            {fromAcct?.name || '-'}
+                          </span>
+                        )}
+                        {(activeTab === 'transfer' || activeTab === 'saving') && tx.admin_fee && Number(tx.admin_fee) > 0 && (
+                          <span className="text-[10px] text-text-muted font-medium">
+                            Admin: {fmt(Number(tx.admin_fee))}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Desktop Table */}
+            <div className="hidden md:block card shadow-sm border-line bg-surface overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-[12px]">
+                  <thead>
+                    <tr className="border-b border-line bg-surface-alt/30 text-left">
+                      <SortHeader label="Tanggal" sortKey="date" />
+                      <SortHeader 
+                        label={activeTab === 'saving' ? 'Tabungan Tujuan' : 'Deskripsi'} 
+                        sortKey="description" 
+                      />
+                      {activeTab === 'expense' && (
+                        <>
+                          <th className="px-5 py-3 font-bold uppercase tracking-wider text-[10px] text-text-muted">Kategori</th>
+                          <th className="px-5 py-3 font-bold uppercase tracking-wider text-[10px] text-text-muted">Tujuan</th>
+                        </>
+                      )}
+                      {activeTab === 'bill' && (
+                        <th className="px-5 py-3 font-bold uppercase tracking-wider text-[10px] text-text-muted" colSpan={2}>Tujuan Tagihan</th>
+                      )}
+                      <SortHeader 
+                        label={(activeTab === 'transfer' || activeTab === 'saving') ? 'Relasi Akun' : 'Akun'} 
+                        sortKey="account" 
+                      />
+                      {(activeTab === 'transfer' || activeTab === 'saving') && (
+                        <SortHeader label="Biaya Admin" sortKey="admin_fee" align="right" />
+                      )}
+                      <SortHeader label="Jumlah" sortKey="amount" align="right" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sortedData.length === 0 ? (
+                      <tr>
+                        <td colSpan={activeTab === 'expense' ? 6 : (activeTab === 'transfer' || activeTab === 'saving') ? 5 : 4} className="px-5 py-16 text-center text-text-muted text-sm font-medium">
+                          Belum ada transaksi di tab ini.
+                        </td>
+                      </tr>
+                    ) : (
+                      sortedData.map(tx => {
+                        const fromAcct = accounts.find((a: Account) => a.id === tx.from_account_id);
+                        const toAcct = accounts.find((a: Account) => a.id === tx.to_account_id);
+                        const wishlist = wishlists.find((w: Wishlist) => w.id === tx.wishlist_id);
+                        const category = categories.find((c: ExpenseCategory) => c.id === tx.category_id);
+                        const purpose = purposes.find((p: ExpensePurpose) => p.id === tx.purpose_id);
+                        const billPurpose = billPurposes.find((b: any) => b.id === tx.bill_purpose_id);
+
+                        return (
+                          <tr key={tx.id} onClick={() => openEditModal(tx.original_tx || tx)} className="border-b border-line last:border-0 hover:bg-surface-hover transition-colors group cursor-pointer">
+                            <td className="px-5 py-4 text-text-secondary whitespace-nowrap font-medium">
+                              {format(new Date(tx.date), 'dd MMM yyyy', { locale: id })}
+                            </td>
+                            <td className="px-5 py-4 text-text-primary font-bold group-hover:text-accent transition-colors">
+                              {activeTab === 'saving' ? (wishlist?.name || tx.description) : tx.description}
+                            </td>
+                            {activeTab === 'expense' && (
+                              <>
+                                <td className="px-5 py-4 whitespace-nowrap">
+                                  <span className="inline-block max-w-[120px] truncate bg-surface-alt/50 px-2 py-1 rounded-lg text-text-secondary font-medium border border-line/50 text-[11px]">
+                                    {category?.name || '-'}
+                                  </span>
+                                </td>
+                                <td className="px-5 py-4 whitespace-nowrap">
+                                  <span className="inline-block max-w-[120px] truncate bg-accent/5 px-2 py-1 rounded-lg text-accent font-semibold border border-accent/10 text-[11px]">
+                                    {purpose?.name || '-'}
+                                  </span>
+                                </td>
+                              </>
+                            )}
+                            {activeTab === 'bill' && (
+                              <td className="px-5 py-4 whitespace-nowrap" colSpan={2}>
+                                <span className="inline-block max-w-[200px] truncate bg-warning/10 px-2 py-1 rounded-lg text-warning font-semibold border border-warning/20 text-[11px]">
+                                  {billPurpose?.name || 'Tagihan'}
+                                </span>
+                              </td>
+                            )}
+                            <td className="px-5 py-4 text-text-muted whitespace-nowrap">
+                              {(activeTab === 'transfer' || activeTab === 'saving') 
+                                ? (
+                                   <span className="flex items-center gap-1.5 font-medium">
+                                     <span>{fromAcct?.name || '-'}</span> 
+                                     <span className="text-[10px] opacity-50">➔</span> 
+                                     <span>{toAcct?.name || '-'}</span>
+                                   </span>
+                                  )
+                                : activeTab !== 'bill' 
+                                ? <span className="font-medium bg-surface-alt px-2 py-0.5 rounded text-xs">{(activeTab === 'income' ? toAcct?.name : fromAcct?.name) || '-'}</span>
+                                : <span className="font-medium bg-surface-alt px-2 py-0.5 rounded text-xs">{fromAcct?.name || '-'}</span>
+                              }
+                            </td>
+                            {(activeTab === 'transfer' || activeTab === 'saving') && (
+                              <td className="px-5 py-4 text-right text-text-secondary font-medium">
+                                {tx.admin_fee ? fmt(Number(tx.admin_fee)) : '-'}
+                              </td>
+                            )}
+                            <td className={clsx("px-5 py-4 text-right font-bold text-[13px]", activeTab === 'income' ? "text-success" : "text-text-primary")}>
+                              {activeTab === 'income' ? '+' : activeTab === 'expense' || activeTab === 'bill' ? '-' : ''}{fmt(Number(tx.amount))}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+      
+      <TransactionModal 
+        isOpen={isModalOpen} 
+        onClose={() => { setIsModalOpen(false); setEditingTx(null); }} 
+        onAdd={handleAddTransaction} 
+        onEdit={handleEditTransaction}
+        onDelete={handleDeleteTransaction}
+        type={editingTx?.type || activeTab} 
+        initialData={editingTx}
+      />
+    </div>
+  );
+}
