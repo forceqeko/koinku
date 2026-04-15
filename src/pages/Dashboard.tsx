@@ -1,7 +1,7 @@
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { ArrowDownLeft, ArrowUpRight, Wallet, PiggyBank, Sun, Moon, Plus, Building2, Smartphone, CheckCircle, Archive, Bell } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, Wallet, PiggyBank, Sun, Moon, Plus, Building2, Smartphone, CheckCircle, Archive, Bell, Eye, EyeOff } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import clsx from 'clsx';
 import { format } from 'date-fns';
@@ -17,7 +17,19 @@ export default function Dashboard() {
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [wishlistMenuId, setWishlistMenuId] = useState<string | null>(null);
+  const [showBalance, setShowBalance] = useState(() => {
+    // Load from localStorage, default to true
+    const saved = localStorage.getItem('showBalance');
+    return saved !== null ? JSON.parse(saved) : true;
+  });
   const menuRef = useRef<HTMLDivElement>(null);
+
+  // Toggle balance visibility
+  const toggleBalance = () => {
+    const newValue = !showBalance;
+    setShowBalance(newValue);
+    localStorage.setItem('showBalance', JSON.stringify(newValue));
+  };
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -131,34 +143,49 @@ export default function Dashboard() {
 
           {/* Main Balance */}
           <div className="text-center mb-6">
-            <p className="text-sm font-medium text-bg/80 dark:text-text-muted mb-1">Total Saldo Keuangan</p>
-            <h1 className="text-4xl font-bold tracking-tight">{fmt(totalBalance)}</h1>
+            <div className="flex items-center justify-center gap-2 mb-1">
+              <p className="text-sm font-medium text-bg/80 dark:text-text-muted">Total Saldo Keuangan</p>
+              <button
+                onClick={toggleBalance}
+                className="p-1 rounded-full bg-white/20 dark:bg-surface hover:bg-white/30 dark:hover:bg-surface-hover transition-all"
+                aria-label={showBalance ? "Sembunyikan saldo" : "Tampilkan saldo"}
+              >
+                {showBalance ? (
+                  <EyeOff className="w-3.5 h-3.5 text-bg/80 dark:text-text-muted" />
+                ) : (
+                  <Eye className="w-3.5 h-3.5 text-bg/80 dark:text-text-muted" />
+                )}
+              </button>
+            </div>
+            <h1 className="text-4xl font-bold tracking-tight">
+              {showBalance ? fmt(totalBalance) : '••••••'}
+            </h1>
           </div>
 
           {/* Income/Expense Pills for Current Month */}
           <div className="text-center mb-2">
             <p className="text-[11px] font-medium text-bg/60 dark:text-text-muted uppercase tracking-wider">Ringkasan {currentMonthName}</p>
           </div>
-          <div className="flex justify-center gap-3 mb-2">
-              <div className="bg-white/10 dark:bg-surface/50 backdrop-blur-md px-4 py-2.5 rounded-2xl flex items-center gap-2 border border-white/20 dark:border-line shadow-sm">
-                 <div className="w-5 h-5 rounded-full bg-success flex items-center justify-center shadow-inner">
-                   <ArrowDownLeft className="w-3 h-3 text-white dark:text-bg" />
-                 </div>
-                 <span className="font-semibold text-[13px]">{fmt(income)}</span>
-              </div>
-              <div className="bg-white/10 dark:bg-surface/50 backdrop-blur-md px-4 py-2.5 rounded-2xl flex items-center gap-2 border border-white/20 dark:border-line shadow-sm">
-                 <div className="w-5 h-5 rounded-full bg-danger flex items-center justify-center shadow-inner">
-                   <ArrowUpRight className="w-3 h-3 text-white dark:text-bg" />
-                 </div>
-                 <span className="font-semibold text-[13px]">{fmt(expense)}</span>
-              </div>
-              <div className="bg-white/10 dark:bg-surface/50 backdrop-blur-md px-4 py-2.5 rounded-2xl flex items-center gap-2 border border-white/20 dark:border-line shadow-sm">
-                 <div className="w-5 h-5 rounded-full bg-accent flex items-center justify-center shadow-inner">
-                   <PiggyBank className="w-3 h-3 text-white dark:text-bg" />
-                 </div>
-                 <span className="font-semibold text-[13px]">{fmt(saving)}</span>
-              </div>
-           </div>
+           <div className="flex justify-center gap-3 mb-2">
+               <div className="bg-white/10 dark:bg-surface/50 backdrop-blur-md px-4 py-2.5 rounded-2xl flex items-center gap-2 border border-white/20 dark:border-line shadow-sm">
+                  <div className="w-5 h-5 rounded-full bg-success flex items-center justify-center shadow-inner">
+                    <ArrowDownLeft className="w-3 h-3 text-white dark:text-bg" />
+                  </div>
+                  <span className="font-semibold text-[13px]">{showBalance ? fmt(income) : '••••'}</span>
+               </div>
+               <div className="bg-white/10 dark:bg-surface/50 backdrop-blur-md px-4 py-2.5 rounded-2xl flex items-center gap-2 border border-white/20 dark:border-line shadow-sm">
+                  <div className="w-5 h-5 rounded-full bg-danger flex items-center justify-center shadow-inner">
+                    <ArrowUpRight className="w-3 h-3 text-white dark:text-bg" />
+                  </div>
+                  <span className="font-semibold text-[13px]">{showBalance ? fmt(expense) : '••••'}</span>
+               </div>
+               <div className="bg-white/10 dark:bg-surface/50 backdrop-blur-md px-4 py-2.5 rounded-2xl flex items-center gap-2 border border-white/20 dark:border-line shadow-sm">
+                  <div className="w-5 h-5 rounded-full bg-accent flex items-center justify-center shadow-inner">
+                    <PiggyBank className="w-3 h-3 text-white dark:text-bg" />
+                  </div>
+                  <span className="font-semibold text-[13px]">{showBalance ? fmt(saving) : '••••'}</span>
+               </div>
+            </div>
         </div>
       </div>
 
@@ -172,26 +199,41 @@ export default function Dashboard() {
               <span className={clsx("text-[11px] font-medium px-2 py-1 rounded-md", perfBadge.color)}>{perfBadge.label}</span>
            </div>
            
-            <div className="space-y-3">
-              <div className="flex justify-between text-[13px]">
-                <span className="text-text-muted font-medium">Sisa Budget</span>
-                <span className="font-semibold text-text-primary">{fmt(Math.max(0, income - expense - saving))}</span>
-              </div>
-              <div className="bg-surface-alt rounded-full h-2.5 overflow-hidden shadow-inner">
-                 <div className="bg-accent h-full rounded-full transition-all duration-1000 ease-out" style={{ width: `${Math.min(100, ((expense + saving) / (income || 1)) * 100)}%` }}></div>
-              </div>
-              <p className="text-[11px] text-text-muted font-medium">Terpakai {fmt(expense + saving)} dari {fmt(income)}</p>
-            </div>
+             <div className="space-y-3">
+               <div className="flex justify-between text-[13px]">
+                 <span className="text-text-muted font-medium">Sisa Budget</span>
+                 <span className="font-semibold text-text-primary">{showBalance ? fmt(Math.max(0, income - expense - saving)) : '••••'}</span>
+               </div>
+               <div className="bg-surface-alt rounded-full h-2.5 overflow-hidden shadow-inner">
+                  <div className="bg-accent h-full rounded-full transition-all duration-1000 ease-out" style={{ width: `${Math.min(100, ((expense + saving) / (income || 1)) * 100)}%` }}></div>
+               </div>
+               <p className="text-[11px] text-text-muted font-medium">
+                 {showBalance ? `Terpakai ${fmt(expense + saving)} dari ${fmt(income)}` : 'Terpakai •••• dari ••••'}
+               </p>
+             </div>
         </div>
 
         {/* Balance Tracker Grid */}
-        <div className="card p-4 md:p-5 shadow-sm border-line bg-surface space-y-4">
-           <div className="flex items-center justify-between border-b border-line pb-3">
-             <h2 className="font-bold text-[15px] text-text-primary flex items-center gap-2">
-               <Wallet className="w-4 h-4 text-accent" /> Daftar Akun Anda
-             </h2>
-             <span className="text-[12px] font-medium text-text-muted bg-surface-alt px-2 py-0.5 rounded-full">{accounts.length} Akun Aktif</span>
-           </div>
+         <div className="card p-4 md:p-5 shadow-sm border-line bg-surface space-y-4">
+            <div className="flex items-center justify-between border-b border-line pb-3">
+              <h2 className="font-bold text-[15px] text-text-primary flex items-center gap-2">
+                <Wallet className="w-4 h-4 text-accent" /> Daftar Akun Anda
+              </h2>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={toggleBalance}
+                  className="p-1.5 rounded-full hover:bg-surface-alt transition-all"
+                  aria-label={showBalance ? "Sembunyikan saldo" : "Tampilkan saldo"}
+                >
+                  {showBalance ? (
+                    <EyeOff className="w-4 h-4 text-text-muted" />
+                  ) : (
+                    <Eye className="w-4 h-4 text-text-muted" />
+                  )}
+                </button>
+                <span className="text-[12px] font-medium text-text-muted bg-surface-alt px-2 py-0.5 rounded-full">{accounts.length} Akun Aktif</span>
+              </div>
+            </div>
            
            <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 md:gap-3">
              {accounts.map(account => {
@@ -208,10 +250,12 @@ export default function Dashboard() {
                      </div>
                      <span className="font-bold text-[11px] text-text-primary truncate leading-tight">{account.name}</span>
                    </div>
-                   <div>
-                     <p className="text-[8px] text-text-muted font-bold uppercase tracking-wider opacity-80 leading-none">IDR</p>
-                     <p className="font-bold text-[11px] sm:text-[12px] text-text-primary mt-0.5 truncate">{new Intl.NumberFormat('id-ID', { minimumFractionDigits: 0 }).format(Number(account.balance))}</p>
-                   </div>
+                    <div>
+                      <p className="text-[8px] text-text-muted font-bold uppercase tracking-wider opacity-80 leading-none">IDR</p>
+                      <p className="font-bold text-[11px] sm:text-[12px] text-text-primary mt-0.5 truncate">
+                        {showBalance ? new Intl.NumberFormat('id-ID', { minimumFractionDigits: 0 }).format(Number(account.balance)) : '••••'}
+                      </p>
+                    </div>
                  </div>
                );
              })}
@@ -282,15 +326,17 @@ export default function Dashboard() {
                          <span className={clsx("font-bold text-[11px] truncate", isComplete ? "text-success" : "text-text-primary")}>{w.name}</span>
                        </div>
 
-                       <div className="space-y-0.5">
-                         <p className="text-[10px] text-text-muted font-medium mb-1 truncate">
-                           Terkumpul: <span className={clsx("font-bold", isComplete ? "text-success" : "text-text-primary")}>{new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 }).format(saved / 1000)}k</span>
-                         </p>
-                         <div className="flex justify-between items-end">
-                            <p className="text-[9px] text-text-muted">Target: {new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 }).format(target / 1000)}k</p>
-                            <span className={clsx("text-[10px] font-bold", isComplete ? "text-success" : "text-accent")}>{percentRaw.toFixed(0)}%</span>
-                         </div>
-                       </div>
+                        <div className="space-y-0.5">
+                          <p className="text-[10px] text-text-muted font-medium mb-1 truncate">
+                            Terkumpul: <span className={clsx("font-bold", isComplete ? "text-success" : "text-text-primary")}>
+                              {showBalance ? `${new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 }).format(saved / 1000)}k` : '••••'}
+                            </span>
+                          </p>
+                          <div className="flex justify-between items-end">
+                             <p className="text-[9px] text-text-muted">Target: {showBalance ? `${new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 }).format(target / 1000)}k` : '••••'}</p>
+                             <span className={clsx("text-[10px] font-bold", isComplete ? "text-success" : "text-accent")}>{percentRaw.toFixed(0)}%</span>
+                          </div>
+                        </div>
                      </div>
 
                      <div className="mt-2 text-[10px]">

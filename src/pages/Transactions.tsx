@@ -15,6 +15,7 @@ import { validateTransaction } from '../types';
 type Tab = 'income' | 'expense' | 'saving' | 'transfer' | 'bill';
 type SortKey = 'date' | 'description' | 'account' | 'admin_fee' | 'amount';
 type SortDirection = 'asc' | 'desc' | null;
+type ItemsPerPage = 10 | 25 | 50 | 100;
 
 // Extended transaction type for UI rendering (includes admin fee virtual rows)
 interface TransactionView extends Transaction {
@@ -29,6 +30,8 @@ const tabs: { id: Tab; label: string }[] = [
   { id: 'bill', label: 'Tagihan' },
 ];
 
+const itemsPerPageOptions: ItemsPerPage[] = [10, 25, 50, 100];
+
 export default function Transactions() {
   const [activeTab, setActiveTab] = useState<Tab>('expense');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -39,6 +42,12 @@ export default function Transactions() {
     key: 'date', 
     direction: 'desc' 
   });
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState<ItemsPerPage>(10);
+  const [isItemsPerPageOpen, setIsItemsPerPageOpen] = useState(false);
+  const itemsPerPageRef = useRef<HTMLDivElement>(null);
 
   const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
   const [isYearPickerOpen, setIsYearPickerOpen] = useState(false);
@@ -61,10 +70,18 @@ export default function Transactions() {
       if (yearPickerRef.current && !yearPickerRef.current.contains(event.target as Node)) {
         setIsYearPickerOpen(false);
       }
+      if (itemsPerPageRef.current && !itemsPerPageRef.current.contains(event.target as Node)) {
+        setIsItemsPerPageOpen(false);
+      }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  // Reset pagination when tab or filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab, selectedMonth, selectedYear, itemsPerPage]);
 
   const filtered = useMemo<TransactionView[]>(() => {
     return transactions.flatMap(t => {
@@ -163,6 +180,21 @@ export default function Transactions() {
       return 0;
     });
   }, [filtered, sortConfig, accounts, wishlists, activeTab]);
+
+  // Pagination logic
+  const totalItems = sortedData.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedData = sortedData.slice(startIndex, endIndex);
+
+  const handlePrevPage = () => {
+    if (currentPage > 1) setCurrentPage(currentPage - 1);
+  };
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages) setCurrentPage(currentPage + 1);
+  };
 
   const handleSort = (key: SortKey) => {
     setSortConfig(current => {
@@ -385,7 +417,7 @@ export default function Transactions() {
   };
 
   return (
-    <div className="p-5 md:p-8 max-w-[1200px] mx-auto animate-fade-in pb-24 md:pb-8">
+    <div className="p-5 md:p-8 max-w-[1200px] mx-auto animate-fade-in pb-24 md:pb-6">
       <div className="space-y-6">
         {/* top controls: month selector, tabs, & add button */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -509,13 +541,13 @@ export default function Transactions() {
         ) : (
           <>
             {/* Mobile Card List */}
-            <div className="md:hidden space-y-2.5">
-              {sortedData.length === 0 ? (
-                <div className="card p-8 text-center text-text-muted text-sm font-medium">
-                  Belum ada transaksi di tab ini.
-                </div>
-              ) : (
-                sortedData.map(tx => {
+             <div className="md:hidden space-y-2.5">
+               {paginatedData.length === 0 ? (
+                 <div className="card p-8 text-center text-text-muted text-sm font-medium">
+                   Belum ada transaksi di tab ini.
+                 </div>
+               ) : (
+                 paginatedData.map(tx => {
                   const fromAcct = accounts.find((a: Account) => a.id === tx.from_account_id);
                   const toAcct = accounts.find((a: Account) => a.id === tx.to_account_id);
                   const wishlist = wishlists.find((w: Wishlist) => w.id === tx.wishlist_id);
@@ -611,14 +643,14 @@ export default function Transactions() {
                     </tr>
                   </thead>
                   <tbody>
-                    {sortedData.length === 0 ? (
-                      <tr>
-                        <td colSpan={activeTab === 'expense' ? 6 : (activeTab === 'transfer' || activeTab === 'saving') ? 5 : 4} className="px-5 py-16 text-center text-text-muted text-sm font-medium">
-                          Belum ada transaksi di tab ini.
-                        </td>
-                      </tr>
-                    ) : (
-                      sortedData.map(tx => {
+                     {paginatedData.length === 0 ? (
+                       <tr>
+                         <td colSpan={activeTab === 'expense' ? 6 : (activeTab === 'transfer' || activeTab === 'saving') ? 5 : 4} className="px-5 py-16 text-center text-text-muted text-sm font-medium">
+                           Belum ada transaksi di tab ini.
+                         </td>
+                       </tr>
+                     ) : (
+                       paginatedData.map(tx => {
                         const fromAcct = accounts.find((a: Account) => a.id === tx.from_account_id);
                         const toAcct = accounts.find((a: Account) => a.id === tx.to_account_id);
                         const wishlist = wishlists.find((w: Wishlist) => w.id === tx.wishlist_id);
@@ -658,11 +690,11 @@ export default function Transactions() {
                             <td className="px-5 py-4 text-text-muted whitespace-nowrap">
                               {(activeTab === 'transfer' || activeTab === 'saving') 
                                 ? (
-                                   <span className="flex items-center gap-1.5 font-medium">
-                                     <span>{fromAcct?.name || '-'}</span> 
-                                     <span className="text-[10px] opacity-50">➔</span> 
+                                    <span className="flex items-center gap-1.5 font-medium">
+                                     <span>{fromAcct?.name || '-'}</span>
+                                     <span className="text-[10px] opacity-50">&rarr;</span>
                                      <span>{toAcct?.name || '-'}</span>
-                                   </span>
+                                    </span>
                                   )
                                 : activeTab !== 'bill' 
                                 ? <span className="font-medium bg-surface-alt px-2 py-0.5 rounded text-xs">{(activeTab === 'income' ? toAcct?.name : fromAcct?.name) || '-'}</span>
@@ -680,16 +712,90 @@ export default function Transactions() {
                           </tr>
                         );
                       })
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </>
-        )}
-      </div>
-      
-      <TransactionModal 
+                     )}
+                   </tbody>
+                 </table>
+               </div>
+             </div>
+             
+             {/* Pagination Controls */}
+             {totalItems > 0 && (
+               <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-5 py-4 border-t border-line bg-surface-alt/20 md:rounded-b-xl md:border-x md:border-b md:-mt-px mb-20 md:mb-0">
+                   {/* Items per page dropdown */}
+                   <div className="flex items-center gap-2 text-[13px] text-text-muted">
+                     <span>Tampilkan</span>
+                     <div className="relative" ref={itemsPerPageRef}>
+                       <button
+                         onClick={() => setIsItemsPerPageOpen(!isItemsPerPageOpen)}
+                         className="flex items-center gap-1.5 px-3 py-1.5 bg-surface border border-line rounded-lg hover:border-accent/40 transition-all font-medium text-text-primary min-w-[60px] justify-between"
+                       >
+                         {itemsPerPage}
+                         <ChevronDown className={clsx("w-3.5 h-3.5 text-text-muted transition-transform", isItemsPerPageOpen && "rotate-180")} />
+                       </button>
+                       
+                       {isItemsPerPageOpen && (
+                         <div className="absolute bottom-full left-0 mb-1 z-30 w-[80px] bg-surface border border-line rounded-xl shadow-xl overflow-hidden animate-scale-in p-1">
+                           {itemsPerPageOptions.map((option) => (
+                             <button
+                               key={option}
+                               onClick={() => { setItemsPerPage(option); setIsItemsPerPageOpen(false); }}
+                               className={clsx(
+                                 "w-full px-3 py-2 rounded-lg text-left text-[13px] transition-all",
+                                 itemsPerPage === option
+                                   ? "bg-accent text-white font-bold"
+                                   : "text-text-primary hover:bg-surface-hover hover:text-accent font-medium"
+                               )}
+                             >
+                               {option}
+                             </button>
+                           ))}
+                         </div>
+                       )}
+                     </div>
+                     <span>dari {totalItems} data</span>
+                   </div>
+                   
+                   {/* Page navigation */}
+                   <div className="flex items-center gap-2">
+                     <button
+                       onClick={handlePrevPage}
+                       disabled={currentPage === 1}
+                       className={clsx(
+                         "px-4 py-2 rounded-xl text-[13px] font-medium transition-all border",
+                         currentPage === 1
+                           ? "bg-surface-alt text-text-muted border-line cursor-not-allowed"
+                           : "bg-surface text-text-primary border-line hover:border-accent/40 hover:text-accent"
+                       )}
+                     >
+                       ← Sebelumnya
+                     </button>
+                     
+                     <div className="flex items-center gap-1 px-3">
+                       <span className="text-[13px] font-medium text-text-primary">{currentPage}</span>
+                       <span className="text-[13px] text-text-muted">/</span>
+                       <span className="text-[13px] text-text-muted">{totalPages}</span>
+                     </div>
+                     
+                     <button
+                       onClick={handleNextPage}
+                       disabled={currentPage === totalPages}
+                       className={clsx(
+                         "px-4 py-2 rounded-xl text-[13px] font-medium transition-all border",
+                         currentPage === totalPages
+                           ? "bg-surface-alt text-text-muted border-line cursor-not-allowed"
+                           : "bg-surface text-text-primary border-line hover:border-accent/40 hover:text-accent"
+                       )}
+                      >
+                        Selanjutnya &rarr;
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+       
+       <TransactionModal
         isOpen={isModalOpen} 
         onClose={() => { setIsModalOpen(false); setEditingTx(null); }} 
         onAdd={handleAddTransaction} 

@@ -112,9 +112,9 @@ export default function Layout() {
     <div className="min-h-screen flex bg-bg relative">
       <Sidebar onQuickAdd={() => setQuickAddOpen(true)} />
 
-      <div className="flex-1 flex flex-col min-w-0 pb-[64px] md:pb-0">
+      <div className="flex-1 flex flex-col min-w-0 pb-[84px] md:pb-0 md:pl-[240px]">
         <Topbar />
-        <main className="flex-1 overflow-y-auto w-full">
+        <main className="flex-1 overflow-y-auto w-full h-[calc(100vh-60px)]">
           <div className="max-w-[1100px] mx-auto">
             <Outlet />
           </div>

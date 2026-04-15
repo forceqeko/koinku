@@ -16,7 +16,7 @@ interface SidebarProps {
 export default function Sidebar({ onQuickAdd }: SidebarProps) {
   return (
     <aside
-      className="w-[240px] hidden md:flex flex-col"
+      className="w-[240px] hidden md:flex flex-col fixed left-0 top-0 h-screen z-40"
       style={{
         backgroundColor: 'var(--color-sidebar-bg)',
         borderRight: '1px solid var(--color-sidebar-border)',
