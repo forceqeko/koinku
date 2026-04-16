@@ -31,7 +31,10 @@ function ItemPicker({ isOpen, onClose, items, onSelect, selectedValue, title, pl
   useEffect(() => {
     if (isOpen) {
       setSearch('');
-      setTimeout(() => inputRef.current?.focus(), 100);
+      const isMobile = window.matchMedia('(max-width: 768px)').matches;
+      if (!isMobile) {
+        setTimeout(() => inputRef.current?.focus(), 100);
+      }
     }
   }, [isOpen]);
 

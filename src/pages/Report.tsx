@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, XAxis, YAxis, Tooltip, Legend, LineChart, Line } from 'recharts';
-import { ChevronDown, FileText, Table, ArrowLeft } from 'lucide-react';
+import { ChevronDown, FileText, Table, ArrowLeft, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import clsx from 'clsx';
 import { useData } from '../context/DataContext';
 import jsPDF from 'jspdf';
@@ -13,7 +13,7 @@ const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Se
 const FULL_MONTH_NAMES = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 
 export default function Report() {
-  const { transactions, categories, purposes } = useData();
+  const { transactions, categories, purposes, accounts } = useData();
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
   const [isYearPickerOpen, setIsYearPickerOpen] = useState(false);
@@ -64,10 +64,21 @@ export default function Report() {
     return transactions.filter(t => new Date(t.date).getFullYear() === selectedYear);
   }, [transactions, selectedYear]);
 
+  const prevYearTx = useMemo(() => {
+    return transactions.filter(t => new Date(t.date).getFullYear() === selectedYear - 1);
+  }, [transactions, selectedYear]);
+
   const filteredTx = useMemo(() => {
     if (selectedMonth === null) return yearTx;
     return yearTx.filter(t => new Date(t.date).getMonth() === selectedMonth);
   }, [yearTx, selectedMonth]);
+
+  const prevMonthTx = useMemo(() => {
+    if (selectedMonth === null) return [];
+    const prevMonth = selectedMonth === 0 ? 11 : selectedMonth - 1;
+    const prevMonthYear = selectedMonth === 0 ? selectedYear - 1 : selectedYear;
+    return transactions.filter(t => new Date(t.date).getMonth() === prevMonth && new Date(t.date).getFullYear() === prevMonthYear);
+  }, [transactions, selectedMonth, selectedYear]);
 
   const monthData = useMemo(() => {
     if (selectedMonth !== null) {
@@ -145,7 +156,13 @@ export default function Report() {
     }, 0);
     const totalSaving = filteredTx.filter(t => t.type === 'saving').reduce((sum, t) => sum + Number(t.amount), 0);
 
-    const divisor = selectedMonth !== null ? 1 : 12;
+    let divisor: number;
+    if (selectedMonth !== null) {
+      divisor = 1;
+    } else {
+      const activeMonths = monthData.filter(m => m.Pemasukan > 0 || m.Pengeluaran > 0);
+      divisor = Math.max(activeMonths.length, 1);
+    }
     const avgMonthlyIncome = totalIncome / divisor;
     const avgMonthlyExpense = totalExpense / divisor;
     const topExpenseCategory = expenseByCategory[0]?.name || '-';
@@ -157,10 +174,106 @@ export default function Report() {
     const bestMonth = monthDataForSummary.reduce((best, m) => (m.Pemasukan > best.Pemasukan ? m : best), monthDataForSummary[0] || { name: '-', Pemasukan: 0 });
     const worstMonth = monthDataForSummary.reduce((worst, m) => (m.Pengeluaran > worst.Pengeluaran ? m : worst), monthDataForSummary[0] || { name: '-', Pengeluaran: 0 });
 
-    return { totalIncome, totalExpense, totalSaving, avgMonthlyIncome, avgMonthlyExpense, topExpenseCategory, bestMonth, worstMonth };
+    return { totalIncome, totalExpense, totalSaving, avgMonthlyIncome, avgMonthlyExpense, topExpenseCategory, bestMonth, worstMonth, divisor };
   }, [filteredTx, expenseByCategory, monthData, selectedMonth]);
 
   const totalExpense = expenseByCategory.reduce((a, b) => a + b.value, 0);
+
+  const savingsRate = useMemo(() => {
+    if (summary.totalIncome === 0) return 0;
+    return (summary.totalSaving / summary.totalIncome) * 100;
+  }, [summary.totalIncome, summary.totalSaving]);
+
+  const monthOverMonth = useMemo(() => {
+    const calcChange = (current: number, prev: number) => {
+      if (prev === 0) return null;
+      return ((current - prev) / prev) * 100;
+    };
+
+    const prevPeriodSummary = selectedMonth !== null
+      ? {
+          totalIncome: prevMonthTx.filter(t => t.type === 'income').reduce((sum, t) => sum + Number(t.amount), 0),
+          totalExpense: prevMonthTx.reduce((sum, t) => {
+            if (t.type === 'expense' || t.type === 'bill') return sum + Number(t.amount);
+            return sum;
+          }, 0),
+          totalSaving: prevMonthTx.filter(t => t.type === 'saving').reduce((sum, t) => sum + Number(t.amount), 0),
+        }
+      : {
+          totalIncome: prevYearTx.filter(t => t.type === 'income').reduce((sum, t) => sum + Number(t.amount), 0),
+          totalExpense: prevYearTx.reduce((sum, t) => {
+            if (t.type === 'expense' || t.type === 'bill') return sum + Number(t.amount);
+            return sum;
+          }, 0),
+          totalSaving: prevYearTx.filter(t => t.type === 'saving').reduce((sum, t) => sum + Number(t.amount), 0),
+        };
+
+    const prevPeriodLabel = selectedMonth !== null
+      ? `${FULL_MONTH_NAMES[selectedMonth === 0 ? 11 : selectedMonth - 1]} ${selectedMonth === 0 ? selectedYear - 1 : selectedYear}`
+      : `${selectedYear - 1}`;
+
+    return {
+      incomeChange: calcChange(summary.totalIncome, prevPeriodSummary.totalIncome),
+      expenseChange: calcChange(summary.totalExpense, prevPeriodSummary.totalExpense),
+      savingChange: calcChange(summary.totalSaving, prevPeriodSummary.totalSaving),
+      prevPeriodLabel,
+    };
+  }, [selectedMonth, selectedYear, summary, prevMonthTx, prevYearTx]);
+
+  const topTransactions = useMemo(() => {
+    const incomes = filteredTx
+      .filter(t => t.type === 'income')
+      .sort((a, b) => Number(b.amount) - Number(a.amount))
+      .slice(0, 5);
+
+    const expenses = filteredTx
+      .filter(t => t.type === 'expense' || t.type === 'bill')
+      .sort((a, b) => Number(b.amount) - Number(a.amount))
+      .slice(0, 5);
+
+    return { incomes, expenses };
+  }, [filteredTx]);
+
+  const cashFlow = useMemo(() => {
+    const totalIncome = summary.totalIncome;
+    const totalExpense = summary.totalExpense;
+    const totalSaving = summary.totalSaving;
+    const totalTransfer = filteredTx
+      .filter(t => t.type === 'transfer')
+      .reduce((sum, t) => sum + Number(t.amount), 0);
+    const totalBill = filteredTx
+      .filter(t => t.type === 'bill')
+      .reduce((sum, t) => sum + Number(t.amount), 0);
+    const remaining = totalIncome - totalExpense - totalSaving;
+
+    const expensePercent = totalIncome > 0 ? (totalExpense / totalIncome) * 100 : 0;
+    const savingPercent = totalIncome > 0 ? (totalSaving / totalIncome) * 100 : 0;
+    const billPercent = totalIncome > 0 ? (totalBill / totalIncome) * 100 : 0;
+    const transferPercent = totalIncome > 0 ? (totalTransfer / totalIncome) * 100 : 0;
+    const remainingPercent = totalIncome > 0 ? Math.max(0, (remaining / totalIncome) * 100) : 0;
+
+    return {
+      totalIncome, totalExpense, totalSaving, totalTransfer, totalBill, remaining,
+      expensePercent, savingPercent, billPercent, transferPercent, remainingPercent,
+    };
+  }, [filteredTx, summary]);
+
+  const ComparisonBadge = ({ change, label }: { change: number | null; label: string }) => {
+    if (change === null) return <span className="text-[10px] text-text-muted">Tidak ada data</span>;
+    const isPositive = change > 0;
+    const isNegative = change < 0;
+    const Icon = isPositive ? TrendingUp : isNegative ? TrendingDown : Minus;
+    const color = label === 'Pengeluaran'
+      ? (isPositive ? 'text-danger' : isNegative ? 'text-success' : 'text-text-muted')
+      : (isPositive ? 'text-success' : isNegative ? 'text-danger' : 'text-text-muted');
+
+    return (
+      <span className={clsx("text-[10px] font-medium flex items-center gap-0.5", color)}>
+        <Icon className="w-3 h-3" />
+        {isPositive ? '+' : ''}{change.toFixed(1)}%
+      </span>
+    );
+  };
 
   const exportToPDF = () => {
     const doc = new jsPDF() as any;
@@ -340,27 +453,47 @@ export default function Report() {
           <div className="card p-4">
             <p className="text-[10px] text-text-muted font-medium uppercase tracking-wider mb-1">Total Pemasukan</p>
             <p className="text-[14px] md:text-[15px] font-bold text-success">{fmt(summary.totalIncome)}</p>
+            <div className="mt-1">
+              <ComparisonBadge change={monthOverMonth.incomeChange} label="Pemasukan" />
+            </div>
           </div>
           <div className="card p-4">
             <p className="text-[10px] text-text-muted font-medium uppercase tracking-wider mb-1">Total Pengeluaran</p>
             <p className="text-[14px] md:text-[15px] font-bold text-danger">{fmt(summary.totalExpense)}</p>
+            <div className="mt-1">
+              <ComparisonBadge change={monthOverMonth.expenseChange} label="Pengeluaran" />
+            </div>
           </div>
           <div className="card p-4">
             <p className="text-[10px] text-text-muted font-medium uppercase tracking-wider mb-1">Total Tabungan</p>
             <p className="text-[14px] md:text-[15px] font-bold text-accent">{fmt(summary.totalSaving)}</p>
+            <div className="mt-1">
+              <ComparisonBadge change={monthOverMonth.savingChange} label="Tabungan" />
+            </div>
           </div>
           <div className="card p-4">
             <p className="text-[10px] text-text-muted font-medium uppercase tracking-wider mb-1">Sisa / Defisit</p>
             <p className={`text-[14px] md:text-[15px] font-bold ${summary.totalIncome - summary.totalExpense >= 0 ? 'text-success' : 'text-danger'}`}>
               {fmt(summary.totalIncome - summary.totalExpense)}
             </p>
+            <div className="mt-1">
+              <span className={clsx("text-[10px] font-medium", savingsRate >= 20 ? 'text-success' : savingsRate >= 10 ? 'text-warning' : 'text-danger')}>
+                Tabung {savingsRate.toFixed(1)}%
+              </span>
+            </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
+<div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
           <div className="card p-3">
-            <p className="text-[10px] text-text-muted font-medium">Rata-rata Masuk/{selectedMonth !== null ? 'Bulan' : 'Tahun'}</p>
+            <p className="text-[10px] text-text-muted font-medium">Rata-rata Masuk/Bulan</p>
             <p className="text-[12px] font-bold text-success">{fmt(summary.avgMonthlyIncome)}</p>
+            {selectedMonth === null && <p className="text-[9px] text-text-muted">dari {summary.divisor} bulan berdata</p>}
+          </div>
+          <div className="card p-3">
+            <p className="text-[10px] text-text-muted font-medium">Rata-rata Keluar/Bulan</p>
+            <p className="text-[12px] font-bold text-danger">{fmt(summary.avgMonthlyExpense)}</p>
+            {selectedMonth === null && <p className="text-[9px] text-text-muted">dari {summary.divisor} bulan berdata</p>}
           </div>
           <div className="card p-3">
             <p className="text-[10px] text-text-muted font-medium">Rata-rata Keluar/{selectedMonth !== null ? 'Bulan' : 'Tahun'}</p>
@@ -376,13 +509,197 @@ export default function Report() {
           </div>
         </div>
 
+        {selectedMonth === null && (
+          <div className="card p-4 mt-4 bg-surface-alt/30 border-border/50">
+            <p className="text-[10px] text-text-muted font-medium mb-2">vs {monthOverMonth.prevPeriodLabel}</p>
+            <div className="flex flex-wrap gap-4">
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-text-muted">Pemasukan:</span>
+                <ComparisonBadge change={monthOverMonth.incomeChange} label="Pemasukan" />
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-text-muted">Pengeluaran:</span>
+                <ComparisonBadge change={monthOverMonth.expenseChange} label="Pengeluaran" />
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-text-muted">Tabungan:</span>
+                <ComparisonBadge change={monthOverMonth.savingChange} label="Tabungan" />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {cashFlow.totalIncome > 0 && (
+          <div className="card p-5 mt-4">
+            <h3 className="text-[13px] font-semibold text-text-primary mb-4">Alur Uang</h3>
+            <p className="text-[10px] text-text-muted mb-4">Distribusi kemana uang Anda pergi dari total pemasukan</p>
+
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-success/10 flex items-center justify-center shrink-0">
+                  <svg className="w-5 h-5 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[12px] font-medium text-text-primary">Total Pemasukan</span>
+                    <span className="text-[13px] font-bold text-success">{fmt(cashFlow.totalIncome)}</span>
+                  </div>
+                  <div className="h-3 bg-surface-alt rounded-full overflow-hidden">
+                    <div className="h-full bg-success rounded-full" style={{ width: '100%' }} />
+                  </div>
+                </div>
+              </div>
+
+              <div className="ml-5 border-l-2 border-line pl-4 space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-danger/10 flex items-center justify-center shrink-0">
+                    <span className="text-[11px] font-bold text-danger">1</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[11px] font-medium text-text-primary">Pengeluaran{cashFlow.totalBill > 0 ? ' & Tagihan' : ''}</span>
+                      <span className="text-[12px] font-bold text-danger">{fmt(cashFlow.totalExpense)} <span className="text-[10px] font-normal text-text-muted">({cashFlow.expensePercent.toFixed(1)}%)</span></span>
+                    </div>
+                    <div className="h-2 bg-surface-alt rounded-full overflow-hidden">
+                      <div className="h-full bg-danger rounded-full transition-all duration-500" style={{ width: `${Math.min(cashFlow.expensePercent, 100)}%` }} />
+                    </div>
+                  </div>
+                </div>
+
+                {cashFlow.totalSaving > 0 && (
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center shrink-0">
+                      <span className="text-[11px] font-bold text-accent">2</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[11px] font-medium text-text-primary">Tabungan</span>
+                        <span className="text-[12px] font-bold text-accent">{fmt(cashFlow.totalSaving)} <span className="text-[10px] font-normal text-text-muted">({cashFlow.savingPercent.toFixed(1)}%)</span></span>
+                      </div>
+                      <div className="h-2 bg-surface-alt rounded-full overflow-hidden">
+                        <div className="h-full bg-accent rounded-full transition-all duration-500" style={{ width: `${Math.min(cashFlow.savingPercent, 100)}%` }} />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {cashFlow.remaining > 0 && (
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-success/10 flex items-center justify-center shrink-0">
+                      <span className="text-[11px] font-bold text-success">3</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[11px] font-medium text-text-primary">Sisa (Belum Terpakai)</span>
+                        <span className="text-[12px] font-bold text-success">{fmt(cashFlow.remaining)} <span className="text-[10px] font-normal text-text-muted">({cashFlow.remainingPercent.toFixed(1)}%)</span></span>
+                      </div>
+                      <div className="h-2 bg-surface-alt rounded-full overflow-hidden">
+                        <div className="h-full bg-success/60 rounded-full transition-all duration-500" style={{ width: `${Math.min(cashFlow.remainingPercent, 100)}%` }} />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {cashFlow.remaining < 0 && (
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-danger/10 flex items-center justify-center shrink-0">
+                      <span className="text-[11px] font-bold text-danger">!</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <span className="text-[11px] text-danger font-medium">Defisit {fmt(Math.abs(cashFlow.remaining))} — Pengeluaran melebihi pemasukan</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-2 pt-3 border-t border-line">
+                <div className="h-4 rounded-full overflow-hidden flex bg-surface-alt">
+                  {cashFlow.expensePercent > 0 && (
+                    <div className="h-full bg-danger transition-all duration-500" style={{ width: `${Math.min(cashFlow.expensePercent, 100)}%` }} title={`Pengeluaran: ${cashFlow.expensePercent.toFixed(1)}%`} />
+                  )}
+                  {cashFlow.savingPercent > 0 && (
+                    <div className="h-full bg-accent transition-all duration-500" style={{ width: `${Math.min(cashFlow.savingPercent, 100)}%` }} title={`Tabungan: ${cashFlow.savingPercent.toFixed(1)}%`} />
+                  )}
+                  {cashFlow.remainingPercent > 0 && (
+                    <div className="h-full bg-success/60 transition-all duration-500" style={{ width: `${Math.min(cashFlow.remainingPercent, 100)}%` }} title={`Sisa: ${cashFlow.remainingPercent.toFixed(1)}%`} />
+                  )}
+                </div>
+                <div className="flex items-center gap-4 mt-2">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-2.5 h-2.5 rounded-full bg-danger" />
+                    <span className="text-[10px] text-text-muted">Pengeluaran</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-2.5 h-2.5 rounded-full bg-accent" />
+                    <span className="text-[10px] text-text-muted">Tabungan</span>
+                  </div>
+                  {cashFlow.remainingPercent > 0 && (
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-2.5 h-2.5 rounded-full bg-success/60" />
+                      <span className="text-[10px] text-text-muted">Sisa</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {(topTransactions.incomes.length > 0 || topTransactions.expenses.length > 0) && (
+          <div className="card p-5 mt-4">
+            <h3 className="text-[13px] font-semibold text-text-primary mb-4">Transaksi Terbesar</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {topTransactions.expenses.length > 0 && (
+                <div>
+                  <p className="text-[11px] text-text-muted font-medium uppercase tracking-wider mb-3">Pengeluaran Terbesar</p>
+                  <div className="space-y-2">
+                    {topTransactions.expenses.map((tx, idx) => {
+                      const cat = categories.find((c: any) => c.id === tx.category_id);
+                      return (
+                        <div key={tx.id} className="flex items-center gap-3 text-[12px]">
+                          <span className="w-5 h-5 rounded-full bg-danger/10 text-danger flex items-center justify-center text-[10px] font-bold">{idx + 1}</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-text-primary truncate">{tx.description}</p>
+                            <p className="text-[10px] text-text-muted">{cat?.name || '-'}</p>
+                          </div>
+                          <span className="font-bold text-danger">-{fmt(Number(tx.amount))}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              {topTransactions.incomes.length > 0 && (
+                <div>
+                  <p className="text-[11px] text-text-muted font-medium uppercase tracking-wider mb-3">Pemasukan Terbesar</p>
+                  <div className="space-y-2">
+                    {topTransactions.incomes.map((tx, idx) => {
+                      const acct = accounts.find((a: any) => a.id === tx.to_account_id);
+                      return (
+                        <div key={tx.id} className="flex items-center gap-3 text-[12px]">
+                          <span className="w-5 h-5 rounded-full bg-success/10 text-success flex items-center justify-center text-[10px] font-bold">{idx + 1}</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-text-primary truncate">{tx.description}</p>
+                            <p className="text-[10px] text-text-muted">{acct?.name || '-'}</p>
+                          </div>
+                          <span className="font-bold text-success">+{fmt(Number(tx.amount))}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-5">
           <div className="card p-5">
             <h3 className="text-[13px] font-semibold text-text-primary mb-1">
               {selectedMonth !== null ? 'Tren Bulanan' : 'Tren Bulanan'}
             </h3>
             {selectedMonth !== null && (
-              <p className="text-[10px] text-text-muted mb-3">Melihat databulan {FULL_MONTH_NAMES[selectedMonth]} saja</p>
+              <p className="text-[10px] text-text-muted mb-3">Melihat data bulan {FULL_MONTH_NAMES[selectedMonth]} saja</p>
             )}
             <p className="text-[10px] text-text-muted mb-3">Klik bulan di chart untuk melihat detail</p>
             <div className="h-64">
@@ -437,14 +754,24 @@ export default function Report() {
                           <Cell key={i} fill={COLORS[i % COLORS.length]} />
                         ))}
                       </Pie>
-                      <Tooltip formatter={(v: number) => fmt(v)} />
+                      <Tooltip
+                        formatter={(v: number, name: string) => [`${fmt(v)} (${((v / totalExpense) * 100).toFixed(1)}%)`, name]}
+                        contentStyle={{
+                          backgroundColor: '#ffffff',
+                          border: '1px solid oklch(0.9297 0.0128 164.7776)',
+                          borderRadius: '12px',
+                          boxShadow: '0px 10px 30px 0px hsl(142 76% 10% / 0.10), 0px 2px 4px -1px hsl(142 76% 10% / 0.10)',
+                          fontSize: '12px',
+                          padding: '8px 12px',
+                        }}
+                      />
                       <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '11px' }} />
                     </PieChart>
                   </ResponsiveContainer>
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ marginBottom: 25 }}>
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ marginBottom: 25, zIndex: 0 }}>
                     <div className="text-center">
                       <p className="text-[10px] text-text-muted">Total</p>
-                      <p className="text-[13px] font-semibold text-text-primary">{fmt(totalExpense)}</p>
+                      <p className="text-[13px] font-bold text-text-primary">{fmt(totalExpense)}</p>
                     </div>
                   </div>
                 </>

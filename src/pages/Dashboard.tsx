@@ -94,7 +94,6 @@ export default function Dashboard() {
 
   const expense = currentMonthTx.reduce((acc, t) => {
     if (t.type === 'expense' || t.type === 'bill') return acc + Number(t.amount);
-    if ((t.type === 'transfer' || t.type === 'saving') && t.admin_fee) return acc + Number(t.admin_fee);
     return acc;
   }, 0);
 
