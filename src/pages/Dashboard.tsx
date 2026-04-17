@@ -327,12 +327,12 @@ export default function Dashboard() {
 
                         <div className="space-y-0.5">
                           <p className="text-[10px] text-text-muted font-medium mb-1 truncate">
-                            Terkumpul: <span className={clsx("font-bold", isComplete ? "text-success" : "text-text-primary")}>
-                              {showBalance ? `${new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 }).format(saved / 1000)}k` : '••••'}
-                            </span>
-                          </p>
-                          <div className="flex justify-between items-end">
-                             <p className="text-[9px] text-text-muted">Target: {showBalance ? `${new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 }).format(target / 1000)}k` : '••••'}</p>
+Terkumpul: <span className={clsx("font-bold", isComplete ? "text-success" : "text-text-primary")}>
+                               {showBalance ? fmt(saved) : '••••'}
+                             </span>
+                           </p>
+                           <div className="flex justify-between items-end">
+                              <p className="text-[9px] text-text-muted">Target: {showBalance ? fmt(target) : '••••'}</p>
                              <span className={clsx("text-[10px] font-bold", isComplete ? "text-success" : "text-accent")}>{percentRaw.toFixed(0)}%</span>
                           </div>
                         </div>

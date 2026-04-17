@@ -501,13 +501,14 @@ export default function Transactions() {
             </button>
           </div>
 
-          <div className="flex bg-surface-alt/10 dark:bg-surface-alt/40 p-1 rounded-2xl border border-line w-full md:w-fit overflow-x-auto no-scrollbar gap-1 md:order-2">
+          <div className="grid grid-cols-5 md:flex bg-surface-alt/10 dark:bg-surface-alt/40 p-1 rounded-2xl border border-line w-full gap-0.5 md:gap-1">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={clsx(
-                  'px-2 md:px-5 py-2 rounded-xl text-[11px] md:text-[12px] font-bold transition-all whitespace-nowrap uppercase tracking-wider flex-1 md:flex-none text-center',
+                  'py-2 rounded-xl font-bold transition-all uppercase tracking-wider text-center',
+                  'text-[9px] leading-tight md:text-[12px] md:px-5 md:whitespace-nowrap',
                   activeTab === tab.id
                     ? 'bg-accent text-bg shadow-md shadow-accent/10 dark:shadow-accent/5'
                     : 'text-text-muted hover:text-text-primary hover:bg-surface-hover'
