@@ -59,8 +59,8 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-bg">
-      <div className="flex-1 flex flex-col items-center justify-center px-4 py-8 relative">
+    <div className="min-h-screen flex flex-col bg-bg page-transition-shell">
+      <div className="page-transition-stage flex-1 flex flex-col items-center justify-center px-4 py-8 relative">
         <button
           onClick={toggleTheme}
           className="absolute top-5 right-5 w-10 h-10 rounded-xl bg-surface border border-line flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-surface-hover transition-all active:scale-95"

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Outlet, NavLink } from 'react-router-dom';
+import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import Sidebar, { navItems } from './Sidebar';
 import Topbar from './Topbar';
 import TransactionModal from './TransactionModal';
@@ -14,6 +14,7 @@ export default function Layout() {
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const { refresh } = useData();
   const { user } = useAuth();
+  const location = useLocation();
 
   const adjustBalance = async (accountId: string, delta: number) => {
     const { error } = await supabase.rpc('adjust_account_balance', { account_id: accountId, delta });
@@ -115,8 +116,13 @@ export default function Layout() {
       <div className="flex-1 flex flex-col min-w-0 pb-[84px] md:pb-0 md:pl-[240px]">
         <Topbar />
         <main className="flex-1 overflow-y-auto w-full h-[calc(100vh-60px)]">
-          <div className="max-w-[1100px] mx-auto">
-            <Outlet />
+          <div className="max-w-[1100px] mx-auto page-transition-shell">
+            <div
+              key={`${location.pathname}${location.search}`}
+              className="page-transition-stage"
+            >
+              <Outlet />
+            </div>
           </div>
         </main>
       </div>

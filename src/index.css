@@ -67,6 +67,8 @@
 
   /* Typography */
   --tracking-normal: -0.03em;
+  --page-transition-duration: 520ms;
+  --page-transition-ease: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /* ─── Dark ──────────────────────────────────── */
@@ -258,6 +260,90 @@
 }
 
 /* ─── Toast / Skeleton Animations ──────────── */
+@keyframes fade-in {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+.animate-fade-in {
+  animation: fade-in 0.24s ease-out forwards;
+}
+
+@keyframes scale-in {
+  0% {
+    opacity: 0;
+    transform: translateY(14px) scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.animate-scale-in {
+  animation: scale-in 0.28s var(--page-transition-ease) forwards;
+}
+
+@keyframes page-enter {
+  0% {
+    opacity: 0;
+    transform: translateY(26px) scale(0.985);
+    filter: blur(12px);
+  }
+  55% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes page-glint {
+  0% {
+    opacity: 0.65;
+    transform: translateY(-8px) scaleX(0.94);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(22px) scaleX(1.02);
+  }
+}
+
+.page-transition-shell {
+  position: relative;
+  isolation: isolate;
+  overflow-x: clip;
+}
+
+.page-transition-stage {
+  position: relative;
+  animation: page-enter var(--page-transition-duration) var(--page-transition-ease) both;
+  transform-origin: 50% 0;
+  will-change: transform, opacity, filter;
+}
+
+.page-transition-stage::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 1rem;
+  right: 1rem;
+  height: 1px;
+  border-radius: 999px;
+  background:
+    linear-gradient(
+      90deg,
+      transparent 0%,
+      color-mix(in oklch, var(--color-accent) 55%, white 45%) 18%,
+      color-mix(in oklch, var(--color-accent) 25%, transparent 75%) 50%,
+      color-mix(in oklch, var(--color-accent) 55%, white 45%) 82%,
+      transparent 100%
+    );
+  opacity: 0;
+  pointer-events: none;
+  animation: page-glint 0.7s var(--page-transition-ease) 0.04s both;
+}
+
 @keyframes slide-up {
   0% { opacity: 0; transform: translateY(12px) scale(0.96); }
   100% { opacity: 1; transform: translateY(0) scale(1); }
@@ -287,4 +373,25 @@
 
 html {
   overflow-x: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+  }
+
+  .animate-fade-in,
+  .animate-scale-in,
+  .animate-slide-up,
+  .page-transition-stage,
+  .page-transition-stage::before,
+  .skeleton {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+    filter: none !important;
+    opacity: 1 !important;
+  }
 }

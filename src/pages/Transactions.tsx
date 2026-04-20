@@ -417,98 +417,110 @@ export default function Transactions() {
   };
 
   return (
-    <div className="p-5 md:p-8 max-w-[1200px] mx-auto animate-fade-in pb-24 md:pb-6">
+    <div className="p-5 md:p-8 max-w-[1200px] mx-auto pb-24 md:pb-6">
       <div className="space-y-6">
-        {/* top controls: month selector, tabs, & add button */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center justify-between gap-3 w-full md:w-auto md:order-1">
-            <div className="relative" ref={monthPickerRef}>
-              <button 
-                onClick={() => setIsMonthPickerOpen(!isMonthPickerOpen)}
-                className="bg-surface border border-line px-5 py-2.5 rounded-2xl flex items-center gap-3 shadow-sm hover:border-accent/40 transition-all font-bold text-[13px] text-text-primary min-w-[170px] md:min-w-[180px] justify-between group h-[46px]"
-              >
-                 <div className="flex items-center gap-2.5">
-                    <div className="w-7 h-7 rounded-lg bg-accent/10 flex items-center justify-center">
-                      <Calendar className="w-4 h-4 text-accent" />
+        {/* top controls: month selector, year, tabs, & add button */}
+        <div className="space-y-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-center justify-between gap-3 w-full md:w-auto">
+              <div className="flex items-center gap-3">
+                <div className="relative" ref={monthPickerRef}>
+                  <button 
+                    onClick={() => setIsMonthPickerOpen(!isMonthPickerOpen)}
+                    className="bg-surface border border-line px-5 py-2.5 rounded-2xl flex items-center gap-3 shadow-sm hover:border-accent/40 transition-all font-bold text-[13px] text-text-primary min-w-[170px] md:min-w-[180px] justify-between group h-[46px]"
+                  >
+                     <div className="flex items-center gap-2.5">
+                        <div className="w-7 h-7 rounded-lg bg-accent/10 flex items-center justify-center">
+                          <Calendar className="w-4 h-4 text-accent" />
+                        </div>
+                        <span className="truncate">{months[selectedMonth]}</span>
+                     </div>
+                     <ChevronDown className={clsx("w-4 h-4 text-text-muted transition-transform duration-300", isMonthPickerOpen && "rotate-180")} />
+                  </button>
+                  
+                  {isMonthPickerOpen && (
+                    <div className="absolute top-full left-0 mt-2 z-30 w-[220px] bg-surface border border-line rounded-2xl shadow-2xl overflow-hidden animate-scale-in p-1">
+                      <div className="grid grid-cols-1 max-h-[300px] overflow-y-auto custom-scrollbar">
+                        {months.map((m, idx) => (
+                          <button 
+                            key={m} 
+                            onClick={() => { setSelectedMonth(idx); setIsMonthPickerOpen(false); }}
+                            className={clsx(
+                              "w-full px-4 py-2.5 rounded-xl text-left text-[13px] transition-all flex items-center justify-between group",
+                              selectedMonth === idx 
+                                ? "bg-accent text-white font-bold" 
+                                : "text-text-primary hoven:bg-surface-hover hover:text-accent font-medium"
+                            )}
+                          >
+                            {m}
+                            {selectedMonth === idx && <div className="w-1.5 h-1.5 rounded-full bg-white opacity-80" />}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                    <span className="truncate">{months[selectedMonth]}</span>
-                 </div>
-                 <ChevronDown className={clsx("w-4 h-4 text-text-muted transition-transform duration-300", isMonthPickerOpen && "rotate-180")} />
-              </button>
-              
-              {isMonthPickerOpen && (
-                <div className="absolute top-full left-0 mt-2 z-30 w-[220px] bg-surface border border-line rounded-2xl shadow-2xl overflow-hidden animate-scale-in p-1">
-                  <div className="grid grid-cols-1 max-h-[300px] overflow-y-auto custom-scrollbar">
-                    {months.map((m, idx) => (
-                      <button 
-                        key={m} 
-                        onClick={() => { setSelectedMonth(idx); setIsMonthPickerOpen(false); }}
-                        className={clsx(
-                          "w-full px-4 py-2.5 rounded-xl text-left text-[13px] transition-all flex items-center justify-between group",
-                          selectedMonth === idx 
-                            ? "bg-accent text-white font-bold" 
-                            : "text-text-primary hoven:bg-surface-hover hover:text-accent font-medium"
-                        )}
-                      >
-                        {m}
-                        {selectedMonth === idx && <div className="w-1.5 h-1.5 rounded-full bg-white opacity-80" />}
-                      </button>
-                    ))}
-                  </div>
+                  )}
                 </div>
-              )}
-            </div>
 
-            {/* Year Picker */}
-            <div className="relative" ref={yearPickerRef}>
+                {/* Year Picker */}
+                <div className="relative" ref={yearPickerRef}>
+                  <button 
+                    onClick={() => setIsYearPickerOpen(!isYearPickerOpen)}
+                    className="bg-surface border border-line px-5 py-2.5 rounded-2xl flex items-center gap-3 shadow-sm hover:border-accent/40 transition-all font-bold text-[13px] text-text-primary justify-between group h-[46px]"
+                  >
+                    <span>{selectedYear}</span>
+                    <ChevronDown className={clsx("w-4 h-4 text-text-muted transition-transform duration-300", isYearPickerOpen && "rotate-180")} />
+                  </button>
+
+                  {isYearPickerOpen && (
+                    <div className="absolute top-full left-0 mt-2 z-30 w-[140px] bg-surface border border-line rounded-2xl shadow-2xl overflow-hidden animate-scale-in p-1">
+                      <div className="grid grid-cols-1 max-h-[200px] overflow-y-auto custom-scrollbar">
+                        {availableYears.map(y => (
+                          <button 
+                            key={y} 
+                            onClick={() => { setSelectedYear(y); setIsYearPickerOpen(false); }}
+                            className={clsx(
+                              "w-full px-4 py-2.5 rounded-xl text-left text-[13px] transition-all flex items-center justify-between group",
+                              selectedYear === y 
+                                ? "bg-accent text-white font-bold" 
+                                : "text-text-primary hover:bg-surface-hover hover:text-accent font-medium"
+                            )}
+                          >
+                            {y}
+                            {selectedYear === y && <div className="w-1.5 h-1.5 rounded-full bg-white opacity-80" />}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               <button 
-                onClick={() => setIsYearPickerOpen(!isYearPickerOpen)}
-                className="bg-surface border border-line px-5 py-2.5 rounded-2xl flex items-center gap-3 shadow-sm hover:border-accent/40 transition-all font-bold text-[13px] text-text-primary justify-between group h-[46px]"
+                onClick={() => { setEditingTx(null); setIsModalOpen(true); }}
+                className="btn btn-primary shadow-lg shadow-accent/20 flex items-center justify-center gap-2 h-[46px] px-4 rounded-2xl active:scale-95 transition-all shrink-0 md:hidden"
               >
-                <span>{selectedYear}</span>
-                <ChevronDown className={clsx("w-4 h-4 text-text-muted transition-transform duration-300", isYearPickerOpen && "rotate-180")} />
+                <Plus className="w-4 h-4" />
+                <span className="font-bold text-[13px]">Tambah</span>
               </button>
-
-              {isYearPickerOpen && (
-                <div className="absolute top-full left-0 mt-2 z-30 w-[140px] bg-surface border border-line rounded-2xl shadow-2xl overflow-hidden animate-scale-in p-1">
-                  <div className="grid grid-cols-1 max-h-[200px] overflow-y-auto custom-scrollbar">
-                    {availableYears.map(y => (
-                      <button 
-                        key={y} 
-                        onClick={() => { setSelectedYear(y); setIsYearPickerOpen(false); }}
-                        className={clsx(
-                          "w-full px-4 py-2.5 rounded-xl text-left text-[13px] transition-all flex items-center justify-between group",
-                          selectedYear === y 
-                            ? "bg-accent text-white font-bold" 
-                            : "text-text-primary hover:bg-surface-hover hover:text-accent font-medium"
-                        )}
-                      >
-                        {y}
-                        {selectedYear === y && <div className="w-1.5 h-1.5 rounded-full bg-white opacity-80" />}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
 
             <button 
               onClick={() => { setEditingTx(null); setIsModalOpen(true); }}
-              className="btn btn-primary shadow-lg shadow-accent/20 flex items-center justify-center gap-2 h-[46px] px-4 rounded-2xl active:scale-95 transition-all shrink-0 md:hidden"
+              className="hidden md:flex btn btn-primary shadow-lg shadow-accent/20 items-center justify-center gap-2 h-[46px] px-5 rounded-2xl active:scale-95 transition-all shrink-0"
             >
               <Plus className="w-4 h-4" />
-              <span className="font-bold text-[13px]">Tambah</span>
+              <span className="font-bold text-[14px]">Tambah Transaksi</span>
             </button>
           </div>
 
-          <div className="grid grid-cols-5 md:flex bg-surface-alt/10 dark:bg-surface-alt/40 p-1 rounded-2xl border border-line w-full gap-0.5 md:gap-1">
+          <div className="grid grid-cols-5 bg-surface-alt/10 dark:bg-surface-alt/40 p-1 rounded-2xl border border-line w-full gap-0.5 md:gap-1">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={clsx(
                   'py-2 rounded-xl font-bold transition-all uppercase tracking-wider text-center',
-                  'text-[9px] leading-tight md:text-[12px] md:px-5 md:whitespace-nowrap',
+                  'text-[9px] leading-tight md:text-[11px] lg:text-[12px] md:px-3 lg:px-5',
                   activeTab === tab.id
                     ? 'bg-accent text-bg shadow-md shadow-accent/10 dark:shadow-accent/5'
                     : 'text-text-muted hover:text-text-primary hover:bg-surface-hover'
@@ -518,14 +530,6 @@ export default function Transactions() {
               </button>
             ))}
           </div>
-
-          <button 
-            onClick={() => { setEditingTx(null); setIsModalOpen(true); }}
-            className="hidden md:flex btn btn-primary shadow-lg shadow-accent/20 items-center justify-center gap-2 h-[46px] px-5 rounded-2xl active:scale-95 transition-all shrink-0 md:order-3"
-          >
-            <Plus className="w-4 h-4" />
-            <span className="font-bold text-[14px]">Tambah Transaksi</span>
-          </button>
         </div>
 
         {/* Table (Desktop) / Cards (Mobile) */}
