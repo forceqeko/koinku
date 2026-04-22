@@ -328,7 +328,7 @@ export default function Transactions() {
         }
       }
 
-      refresh();
+      await refresh();
       toast.success('Transaksi berhasil ditambahkan!');
     } catch (err: any) {
       // Rollback if transaction was inserted but something else failed
@@ -374,7 +374,7 @@ export default function Transactions() {
         throw balanceError;
       }
 
-      refresh();
+      await refresh();
       toast.success('Transaksi berhasil diperbarui!');
     } catch (err: any) {
       if (!updateFailed) {
@@ -404,7 +404,7 @@ export default function Transactions() {
         throw balanceError;
       }
 
-      refresh();
+      await refresh();
       toast.success('Transaksi berhasil dihapus.');
     } catch (err: any) {
       toast.error('Gagal: ' + err.message);

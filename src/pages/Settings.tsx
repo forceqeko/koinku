@@ -121,6 +121,7 @@ export default function Settings() {
         const { count } = await supabase
           .from('transactions')
           .select('*', { count: 'exact', head: true })
+          .is('deleted_at', null)
           .or(`from_account_id.eq.${id},to_account_id.eq.${id}`);
         
         if (count && count > 0) {
@@ -132,6 +133,7 @@ export default function Settings() {
         const { count } = await supabase
           .from('transactions')
           .select('*', { count: 'exact', head: true })
+          .is('deleted_at', null)
           .eq('category_id', id);
         
         if (count && count > 0) {
@@ -143,6 +145,7 @@ export default function Settings() {
         const { count } = await supabase
           .from('transactions')
           .select('*', { count: 'exact', head: true })
+          .is('deleted_at', null)
           .eq('purpose_id', id);
         
         if (count && count > 0) {
@@ -154,6 +157,7 @@ export default function Settings() {
         const { count } = await supabase
           .from('transactions')
           .select('*', { count: 'exact', head: true })
+          .is('deleted_at', null)
           .eq('wishlist_id', id);
         
         if (count && count > 0) {
@@ -165,6 +169,7 @@ export default function Settings() {
         const { count } = await supabase
           .from('transactions')
           .select('*', { count: 'exact', head: true })
+          .is('deleted_at', null)
           .eq('source_id', id);
         
         if (count && count > 0) {
@@ -176,6 +181,7 @@ export default function Settings() {
         const { count } = await supabase
           .from('transactions')
           .select('*', { count: 'exact', head: true })
+          .is('deleted_at', null)
           .eq('bill_purpose_id', id);
         
         if (count && count > 0) {

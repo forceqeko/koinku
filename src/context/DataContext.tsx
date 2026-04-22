@@ -58,11 +58,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
         supabase.from('income_sources').select('*').eq('user_id', user.id).order('created_at'),
         supabase.from('wishlists').select('*').eq('user_id', user.id).order('created_at'),
         supabase.from('bill_purposes').select('*').eq('user_id', user.id).order('created_at'),
-        // Point 16: Filter out soft-deleted transactions (deleted_at IS NULL)
-        // CATATAN: Pastikan kolom deleted_at sudah ada di database sebelum mengaktifkan filter ini
-        // Jalankan migration SQL terlebih dahulu, baru uncomment baris di bawah
-        // supabase.from('transactions').select('*').eq('user_id', user.id).is('deleted_at', null).order('date', { ascending: false })
-        supabase.from('transactions').select('*').eq('user_id', user.id).order('date', { ascending: false })
+        supabase
+          .from('transactions')
+          .select('*')
+          .eq('user_id', user.id)
+          .is('deleted_at', null)
+          .order('date', { ascending: false })
       ]);
       
       setData({
