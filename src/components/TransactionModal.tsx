@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { X, ChevronDown, Check, Building2, Smartphone, Wallet, Trash2, Search } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { formatThousands, parseThousands } from '../lib/utils';
@@ -256,7 +257,7 @@ export default function TransactionModal({ isOpen, onClose, onAdd, onEdit, onDel
 
   const typeLabel = type === 'income' ? 'Pemasukan' : type === 'expense' ? 'Pengeluaran' : type === 'saving' ? 'Tabungan' : type === 'transfer' ? 'Transfer' : 'Tagihan';
 
-  return (
+  return createPortal(
     <>
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
         <div className="bg-surface border border-line rounded-2xl w-full max-w-md overflow-hidden animate-scale-in shadow-2xl">
@@ -435,6 +436,7 @@ export default function TransactionModal({ isOpen, onClose, onAdd, onEdit, onDel
           "Cari wishlist..."
         }
       />
-    </>
+    </>,
+    document.body
   );
 }

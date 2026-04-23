@@ -28,9 +28,13 @@ export default function Sidebar({ onQuickAdd }: SidebarProps) {
         style={{ borderBottom: '1px solid var(--color-sidebar-border)' }}
       >
         <div className="flex items-center gap-2.5">
-          <img src="/icon.svg" alt="Koin Ku" className="w-6 h-6" />
+          <img
+            src="/logo.png"
+            alt="Koin Ku"
+            className="w-9 h-9 object-contain rounded-[2px] shrink-0"
+          />
           <span
-            className="text-[15px] font-bold tracking-tight"
+            className="text-[20px] font-bold tracking-tight"
             style={{ color: 'var(--color-sidebar-fg)' }}
           >
             Koin Ku

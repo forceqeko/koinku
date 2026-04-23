@@ -72,7 +72,7 @@ export default function Login() {
           <div className="card p-6 shadow-lg">
             <div className="flex flex-col items-center mb-6">
               <div className="w-16 h-16 rounded-2xl bg-accent/10 border border-accent/20 flex items-center justify-center mb-4 shadow-lg shadow-accent/10">
-                <img src="/icon.svg" alt="Koin Ku" className="w-10 h-10" />
+                <img src="/logo.png" alt="Koin Ku" className="w-14 h-14 object-contain rounded-sm" />
               </div>
               <h1 className="text-2xl font-bold text-text-primary tracking-tight">
                 {isRegister ? 'Buat Akun Baru' : 'Selamat Datang'}
