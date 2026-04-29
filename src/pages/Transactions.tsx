@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import TransactionModal from '../components/TransactionModal';
-import { Plus, ChevronDown, ArrowUp, ArrowDown, ArrowUpDown, Calendar } from 'lucide-react';
+import { Plus, ChevronDown, ArrowUp, ArrowDown, ArrowUpDown, Calendar, Search } from 'lucide-react';
 import clsx from 'clsx';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
@@ -38,6 +38,7 @@ export default function Transactions() {
   const [editingTx, setEditingTx] = useState<Transaction | null>(null);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [searchTerm, setSearchTerm] = useState('');
   const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection }>({ 
     key: 'date', 
     direction: 'desc' 
@@ -81,7 +82,7 @@ export default function Transactions() {
   // Reset pagination when tab or filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [activeTab, selectedMonth, selectedYear, itemsPerPage]);
+  }, [activeTab, selectedMonth, selectedYear, itemsPerPage, searchTerm]);
 
   const filtered = useMemo<TransactionView[]>(() => {
     return transactions.flatMap(t => {
@@ -114,6 +115,30 @@ export default function Transactions() {
     });
   }, [transactions, selectedMonth, selectedYear, activeTab]);
 
+  const searchedData = useMemo<TransactionView[]>(() => {
+    const keyword = searchTerm.trim().toLowerCase();
+    if (!keyword) return filtered;
+
+    return filtered.filter(tx => {
+      const fromAcct = accounts.find((a: Account) => a.id === tx.from_account_id)?.name || '';
+      const toAcct = accounts.find((a: Account) => a.id === tx.to_account_id)?.name || '';
+      const wishlist = wishlists.find((w: Wishlist) => w.id === tx.wishlist_id)?.name || '';
+      const category = categories.find((c: ExpenseCategory) => c.id === tx.category_id)?.name || '';
+      const purpose = purposes.find((p: ExpensePurpose) => p.id === tx.purpose_id)?.name || '';
+      const billPurpose = billPurposes.find((b: any) => b.id === tx.bill_purpose_id)?.name || '';
+
+      return [
+        tx.description,
+        fromAcct,
+        toAcct,
+        wishlist,
+        category,
+        purpose,
+        billPurpose,
+      ].some(value => value.toLowerCase().includes(keyword));
+    });
+  }, [searchTerm, filtered, accounts, wishlists, categories, purposes, billPurposes]);
+
   // Compute available years from transaction data
   const availableYears = useMemo(() => {
     const years = new Set<number>();
@@ -127,9 +152,9 @@ export default function Transactions() {
   }, [transactions]);
 
   const sortedData = useMemo<TransactionView[]>(() => {
-    if (!sortConfig.key || !sortConfig.direction) return filtered;
+    if (!sortConfig.key || !sortConfig.direction) return searchedData;
 
-    return [...filtered].sort((a, b) => {
+    return [...searchedData].sort((a, b) => {
       let aVal: string | number;
       let bVal: string | number;
 
@@ -179,7 +204,7 @@ export default function Transactions() {
       if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [filtered, sortConfig, accounts, wishlists, activeTab]);
+  }, [searchedData, sortConfig, accounts, wishlists, activeTab]);
 
   // Pagination logic
   const totalItems = sortedData.length;
@@ -504,13 +529,37 @@ export default function Transactions() {
               </button>
             </div>
 
-            <button 
-              onClick={() => { setEditingTx(null); setIsModalOpen(true); }}
-              className="hidden md:flex btn btn-primary shadow-lg shadow-accent/20 items-center justify-center gap-2 h-[46px] px-5 rounded-2xl active:scale-95 transition-all shrink-0"
-            >
-              <Plus className="w-4 h-4" />
-              <span className="font-bold text-[14px]">Tambah Transaksi</span>
-            </button>
+            <div className="hidden md:flex md:items-center md:gap-3 md:flex-1 md:justify-end">
+              <div className="relative w-full max-w-[320px]">
+                <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Cari deskripsi atau akun..."
+                  className="input h-[46px] rounded-2xl pl-11 pr-4 shadow-sm"
+                />
+              </div>
+
+              <button 
+                onClick={() => { setEditingTx(null); setIsModalOpen(true); }}
+                className="btn btn-primary shadow-lg shadow-accent/20 items-center justify-center gap-2 h-[46px] px-5 rounded-2xl active:scale-95 transition-all shrink-0"
+              >
+                <Plus className="w-4 h-4" />
+                <span className="font-bold text-[14px]">Tambah Transaksi</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="relative md:hidden">
+            <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Cari deskripsi atau akun..."
+              className="input h-[46px] rounded-2xl pl-11 pr-4 shadow-sm"
+            />
           </div>
 
           <div className="grid grid-cols-5 bg-surface-alt/10 dark:bg-surface-alt/40 p-1 rounded-2xl border border-line w-full gap-0.5 md:gap-1">
@@ -549,7 +598,7 @@ export default function Transactions() {
              <div className="md:hidden space-y-2.5">
                {paginatedData.length === 0 ? (
                  <div className="card p-8 text-center text-text-muted text-sm font-medium">
-                   Belum ada transaksi di tab ini.
+                   {searchTerm.trim() ? 'Transaksi tidak ditemukan.' : 'Belum ada transaksi di tab ini.'}
                  </div>
                ) : (
                  paginatedData.map(tx => {
@@ -650,8 +699,8 @@ export default function Transactions() {
                   <tbody>
                      {paginatedData.length === 0 ? (
                        <tr>
-                         <td colSpan={activeTab === 'expense' ? 6 : (activeTab === 'transfer' || activeTab === 'saving') ? 5 : 4} className="px-5 py-16 text-center text-text-muted text-sm font-medium">
-                           Belum ada transaksi di tab ini.
+                     <td colSpan={activeTab === 'expense' ? 6 : (activeTab === 'transfer' || activeTab === 'saving') ? 5 : 4} className="px-5 py-16 text-center text-text-muted text-sm font-medium">
+                           {searchTerm.trim() ? 'Transaksi tidak ditemukan.' : 'Belum ada transaksi di tab ini.'}
                          </td>
                        </tr>
                      ) : (

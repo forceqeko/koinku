@@ -251,10 +251,11 @@ export default function Report() {
     const billPercent = totalIncome > 0 ? (totalBill / totalIncome) * 100 : 0;
     const transferPercent = totalIncome > 0 ? (totalTransfer / totalIncome) * 100 : 0;
     const remainingPercent = totalIncome > 0 ? Math.max(0, (remaining / totalIncome) * 100) : 0;
+    const netFlowPercent = totalIncome > 0 ? (Math.abs(remaining) / totalIncome) * 100 : 0;
 
     return {
       totalIncome, totalExpense, totalSaving, totalTransfer, totalBill, remaining,
-      expensePercent, savingPercent, billPercent, transferPercent, remainingPercent,
+      expensePercent, savingPercent, billPercent, transferPercent, remainingPercent, netFlowPercent,
     };
   }, [filteredTx, summary]);
 
@@ -278,86 +279,386 @@ export default function Report() {
   const exportToPDF = () => {
     const doc = new jsPDF() as any;
     const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
     const periodLabel = selectedMonth !== null ? `${FULL_MONTH_NAMES[selectedMonth]} ${selectedYear}` : `Tahun ${selectedYear}`;
 
-    doc.setFontSize(18);
-    doc.setTextColor(40);
-    doc.text('Laporan Keuangan', pageWidth / 2, 20, { align: 'center' });
-    doc.setFontSize(12);
-    doc.text(periodLabel, pageWidth / 2, 28, { align: 'center' });
+    const colors = {
+      primary: [22, 101, 52] as [number, number, number],
+      primarySoft: [232, 242, 236] as [number, number, number],
+      accent: [201, 162, 39] as [number, number, number],
+      text: [30, 41, 59] as [number, number, number],
+      muted: [100, 116, 139] as [number, number, number],
+      line: [226, 232, 240] as [number, number, number],
+      success: [22, 163, 74] as [number, number, number],
+      danger: [220, 38, 38] as [number, number, number],
+      saving: [8, 145, 178] as [number, number, number],
+    };
+
+    let cursorY = 18;
+
+    const ensureSpace = (needed: number) => {
+      if (cursorY + needed <= pageHeight - 18) return;
+      doc.addPage();
+      cursorY = 18;
+    };
+
+    const drawSectionTitle = (title: string, subtitle?: string) => {
+      ensureSpace(16);
+      doc.setFontSize(13);
+      doc.setTextColor(...colors.text);
+      doc.text(title, 16, cursorY);
+      if (subtitle) {
+        doc.setFontSize(9);
+        doc.setTextColor(...colors.muted);
+        doc.text(subtitle, 16, cursorY + 5);
+        cursorY += 11;
+        return;
+      }
+      cursorY += 7;
+    };
+
+    const drawMetricCard = (x: number, y: number, w: number, h: number, label: string, value: string, tone: [number, number, number]) => {
+      doc.setFillColor(248, 250, 252);
+      doc.setDrawColor(...colors.line);
+      doc.roundedRect(x, y, w, h, 6, 6, 'FD');
+      doc.setFillColor(...tone);
+      doc.roundedRect(x + 4, y + 4, 10, 10, 3, 3, 'F');
+      doc.setFontSize(8);
+      doc.setTextColor(...colors.muted);
+      doc.text(label.toUpperCase(), x + 18, y + 8);
+      doc.setFontSize(12);
+      doc.setTextColor(...colors.text);
+      doc.text(value, x + 18, y + 16);
+    };
+
+    const drawProgressBar = (label: string, value: number, color: [number, number, number]) => {
+      ensureSpace(14);
+      doc.setFontSize(9);
+      doc.setTextColor(...colors.text);
+      doc.text(label, 16, cursorY);
+      doc.setTextColor(...colors.muted);
+      doc.text(`${value.toFixed(1)}%`, pageWidth - 16, cursorY, { align: 'right' });
+      doc.setFillColor(241, 245, 249);
+      doc.roundedRect(16, cursorY + 3, pageWidth - 32, 4, 2, 2, 'F');
+      doc.setFillColor(...color);
+      doc.roundedRect(16, cursorY + 3, Math.max(8, ((pageWidth - 32) * Math.min(value, 100)) / 100), 4, 2, 2, 'F');
+      cursorY += 12;
+    };
+
+    doc.setFillColor(...colors.primary);
+    doc.roundedRect(12, 12, pageWidth - 24, 34, 8, 8, 'F');
+    doc.setFillColor(...colors.accent);
+    doc.circle(pageWidth - 26, 24, 10, 'F');
     doc.setFontSize(10);
-    doc.text(`Dicetak: ${format(new Date(), 'dd MMMM yyyy', { locale: id })}`, pageWidth / 2, 34, { align: 'center' });
-    doc.setDrawColor(200);
-    doc.line(20, 40, pageWidth - 20, 40);
+    doc.setTextColor(255, 255, 255);
+    doc.text('Koin Ku', 18, 21);
+    doc.setFontSize(19);
+    doc.text('Laporan Keuangan', 18, 30);
+    doc.setFontSize(10);
+    doc.setTextColor(226, 232, 240);
+    doc.text(periodLabel, 18, 37);
+    doc.text(`Dicetak ${format(new Date(), 'dd MMMM yyyy', { locale: id })}`, pageWidth - 18, 37, { align: 'right' });
+    cursorY = 56;
 
-    doc.setFontSize(14);
-    doc.text(selectedMonth !== null ? 'Ringkasan Bulanan' : 'Ringkasan Tahunan', 20, 50);
-    autoTable(doc, {
-      startY: 55,
-      head: [['Deskripsi', 'Jumlah']],
-      body: [
-        ['Total Pemasukan', fmt(summary.totalIncome)],
-        ['Total Pengeluaran', fmt(summary.totalExpense)],
-        ['Total Tabungan', fmt(summary.totalSaving)],
-        ['Rata-rata Pemasukan/Bulan', fmt(summary.avgMonthlyIncome)],
-        ['Rata-rata Pengeluaran/Bulan', fmt(summary.avgMonthlyExpense)],
-        ['Bulan Terbaik', `${summary.bestMonth.name} (${fmt(summary.bestMonth.Pemasukan)})`],
-        ['Pengeluaran Tertinggi', `${summary.worstMonth.name} (${fmt(summary.worstMonth.Pengeluaran)})`],
-      ],
-      theme: 'striped',
-      headStyles: { fillColor: [59, 130, 246] },
-    });
+    drawSectionTitle('Ringkasan Utama', selectedMonth !== null ? 'Snapshot performa bulan terpilih' : 'Ringkasan performa satu tahun penuh');
+    const cardGap = 6;
+    const cardWidth = (pageWidth - 32 - cardGap) / 2;
+    drawMetricCard(16, cursorY, cardWidth, 22, 'Total Pemasukan', fmt(summary.totalIncome), colors.success);
+    drawMetricCard(16 + cardWidth + cardGap, cursorY, cardWidth, 22, 'Total Pengeluaran', fmt(summary.totalExpense), colors.danger);
+    cursorY += 26;
+    drawMetricCard(16, cursorY, cardWidth, 22, 'Total Tabungan', fmt(summary.totalSaving), colors.saving);
+    drawMetricCard(16 + cardWidth + cardGap, cursorY, cardWidth, 22, 'Arus Bersih', fmt(summary.totalIncome - summary.totalExpense - summary.totalSaving), colors.primary);
+    cursorY += 30;
 
-    doc.setFontSize(14);
-    doc.text('Pengeluaran per Kategori', 20, doc.lastAutoTable.finalY + 15);
+    drawSectionTitle('Komposisi Arus Uang', 'Distribusi dari total pemasukan pada periode ini');
+    drawProgressBar('Pengeluaran', cashFlow.expensePercent, colors.danger);
+    drawProgressBar('Tabungan', cashFlow.savingPercent, colors.saving);
+    if (cashFlow.remainingPercent > 0) {
+      drawProgressBar('Sisa Dana', cashFlow.remainingPercent, colors.success);
+    }
+
+    ensureSpace(34);
+    const insightTop = cursorY;
+    const insightWidth = (pageWidth - 38) / 2;
+    doc.setFillColor(...colors.primarySoft);
+    doc.setDrawColor(...colors.line);
+    doc.roundedRect(16, insightTop, insightWidth, 28, 6, 6, 'FD');
+    doc.roundedRect(22 + insightWidth, insightTop, insightWidth, 28, 6, 6, 'FD');
+    doc.setFontSize(9);
+    doc.setTextColor(...colors.muted);
+    doc.text('Insight Kunci', 22, insightTop + 7);
+    doc.text('Insight Tambahan', 28 + insightWidth, insightTop + 7);
+    doc.setFontSize(11);
+    doc.setTextColor(...colors.text);
+    doc.text(`Kategori tertinggi: ${summary.topExpenseCategory}`, 22, insightTop + 15);
+    doc.text(`Saving rate: ${savingsRate.toFixed(1)}%`, 22, insightTop + 22);
+    doc.text(`Bulan terbaik: ${summary.bestMonth.name}`, 28 + insightWidth, insightTop + 15);
+    doc.text(`Puncak pengeluaran: ${summary.worstMonth.name}`, 28 + insightWidth, insightTop + 22);
+    cursorY += 36;
+
+    drawSectionTitle('Pengeluaran per Kategori');
     autoTable(doc, {
-      startY: doc.lastAutoTable.finalY + 20,
+      startY: cursorY,
       head: [['Kategori', 'Jumlah', 'Persentase']],
-      body: expenseByCategory.map(c => [c.name, fmt(c.value), `${((c.value / totalExpense) * 100).toFixed(1)}%`]),
-      theme: 'striped',
-      headStyles: { fillColor: [59, 130, 246] },
-    });
+      body: expenseByCategory.length > 0
+        ? expenseByCategory.map(c => [c.name, fmt(c.value), `${((c.value / totalExpense) * 100).toFixed(1)}%`])
+        : [['Belum ada data', '-', '-']],
+      theme: 'plain',
+      margin: { left: 16, right: 16 },
+      styles: {
+        fontSize: 9,
+        cellPadding: 3,
+        textColor: colors.text,
+        lineColor: colors.line,
+        lineWidth: 0.2,
+      },
+      headStyles: {
+        fillColor: colors.primary,
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+      },
+      alternateRowStyles: {
+        fillColor: [248, 250, 252],
+      },
+      columnStyles: {
+        1: { halign: 'right' },
+        2: { halign: 'right' },
+      },
+    } as any);
+    cursorY = doc.lastAutoTable.finalY + 10;
+
+    drawSectionTitle('Transaksi Terbesar', 'Lima transaksi paling menonjol pada periode ini');
+    autoTable(doc, {
+      startY: cursorY,
+      head: [['Jenis', 'Deskripsi', 'Akun', 'Jumlah']],
+      body: [
+        ...topTransactions.incomes.map(tx => [
+          'Pemasukan',
+          tx.description,
+          accounts.find((a: any) => a.id === tx.to_account_id)?.name || '-',
+          fmt(Number(tx.amount)),
+        ]),
+        ...topTransactions.expenses.map(tx => [
+          tx.type === 'bill' ? 'Tagihan' : 'Pengeluaran',
+          tx.description,
+          accounts.find((a: any) => a.id === tx.from_account_id)?.name || '-',
+          fmt(Number(tx.amount)),
+        ]),
+      ].slice(0, 10),
+      theme: 'plain',
+      margin: { left: 16, right: 16 },
+      styles: {
+        fontSize: 8.5,
+        cellPadding: 3,
+        textColor: colors.text,
+        lineColor: colors.line,
+        lineWidth: 0.2,
+      },
+      headStyles: {
+        fillColor: colors.accent,
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+      },
+      alternateRowStyles: {
+        fillColor: [250, 250, 250],
+      },
+      columnStyles: {
+        3: { halign: 'right' },
+      },
+    } as any);
+    cursorY = doc.lastAutoTable.finalY + 10;
+
+    drawSectionTitle('Detail Ringkas');
+    autoTable(doc, {
+      startY: cursorY,
+      head: [['Tanggal', 'Tipe', 'Deskripsi', 'Jumlah']],
+      body: filteredTx.slice(0, 12).map(t => [
+        format(new Date(t.date), 'dd MMM yyyy', { locale: id }),
+        t.type,
+        t.description,
+        fmt(Number(t.amount)),
+      ]),
+      theme: 'plain',
+      margin: { left: 16, right: 16 },
+      styles: {
+        fontSize: 8.5,
+        cellPadding: 3,
+        textColor: colors.text,
+        lineColor: colors.line,
+        lineWidth: 0.2,
+      },
+      headStyles: {
+        fillColor: [71, 85, 105],
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+      },
+      alternateRowStyles: {
+        fillColor: [248, 250, 252],
+      },
+      columnStyles: {
+        3: { halign: 'right' },
+      },
+    } as any);
+
+    const totalPages = doc.getNumberOfPages();
+    for (let page = 1; page <= totalPages; page += 1) {
+      doc.setPage(page);
+      doc.setDrawColor(...colors.line);
+      doc.line(16, pageHeight - 12, pageWidth - 16, pageHeight - 12);
+      doc.setFontSize(8);
+      doc.setTextColor(...colors.muted);
+      doc.text('Koin Ku • Laporan otomatis', 16, pageHeight - 7);
+      doc.text(`Halaman ${page} / ${totalPages}`, pageWidth - 16, pageHeight - 7, { align: 'right' });
+    }
 
     doc.save(`Laporan_Keuangan_${selectedYear}${selectedMonth !== null ? `_${FULL_MONTH_NAMES[selectedMonth]}` : ''}.pdf`);
   };
 
   const exportToExcel = () => {
     const periodLabel = selectedMonth !== null ? `${FULL_MONTH_NAMES[selectedMonth]} ${selectedYear}` : `${selectedYear}`;
-    const csvContent = [
-      ['LAPORAN KEUANGAN', periodLabel],
-      [''],
-      [selectedMonth !== null ? 'RINGKASAN BULANAN' : 'RINGKASAN TAHUNAN'],
-      ['Deskripsi', 'Jumlah'],
+    const escapeXml = (value: string) =>
+      value
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&apos;');
+
+    const stringCell = (value: string, style = 'Cell') =>
+      `<Cell ss:StyleID="${style}"><Data ss:Type="String">${escapeXml(value)}</Data></Cell>`;
+
+    const numberCell = (value: number, style = 'NumberCell') =>
+      `<Cell ss:StyleID="${style}"><Data ss:Type="Number">${Number.isFinite(value) ? value : 0}</Data></Cell>`;
+
+    const summaryRows = [
       ['Total Pemasukan', summary.totalIncome],
       ['Total Pengeluaran', summary.totalExpense],
       ['Total Tabungan', summary.totalSaving],
+      ['Arus Bersih', summary.totalIncome - summary.totalExpense - summary.totalSaving],
       ['Rata-rata Pemasukan/Bulan', summary.avgMonthlyIncome],
       ['Rata-rata Pengeluaran/Bulan', summary.avgMonthlyExpense],
-      [''],
-      ['PENGELUARAN PER KATEGORI'],
-      ['Kategori', 'Jumlah', 'Persentase'],
-      ...expenseByCategory.map(c => [c.name, c.value, `${((c.value / totalExpense) * 100).toFixed(1)}%`]),
-      [''],
-      ['TREN BULANAN'],
-      ['Bulan', 'Pemasukan', 'Pengeluaran'],
-      ...monthData.map(m => [m.name, m.Pemasukan, m.Pengeluaran]),
-      [''],
-      ['DETAIL TRANSAKSI'],
-      ['Tanggal', 'Tipe', 'Deskripsi', 'Jumlah'],
-      ...filteredTx.map(t => [format(new Date(t.date), 'yyyy-MM-dd'), t.type, t.description, Number(t.amount)]),
-    ].map(row => row.join(',')).join('\n');
+      ['Saving Rate (%)', Number(savingsRate.toFixed(1))],
+    ];
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const insightRows = [
+      ['Kategori Tertinggi', summary.topExpenseCategory],
+      ['Bulan Terbaik', `${summary.bestMonth.name} (${fmt(summary.bestMonth.Pemasukan)})`],
+      ['Puncak Pengeluaran', `${summary.worstMonth.name} (${fmt(summary.worstMonth.Pengeluaran)})`],
+      ['Dicetak Pada', format(new Date(), 'dd MMMM yyyy', { locale: id })],
+    ];
+
+    const xmlRows = [
+      `<Row ss:Height="28">${stringCell('LAPORAN KEUANGAN', 'TitleCell')}${stringCell('')}${stringCell('')}${stringCell('')}</Row>`,
+      `<Row ss:Height="22">${stringCell(`Periode: ${periodLabel}`, 'SubtitleCell')}${stringCell('')}${stringCell('')}${stringCell('')}</Row>`,
+      `<Row ss:Height="10">${stringCell('')}${stringCell('')}${stringCell('')}${stringCell('')}</Row>`,
+      `<Row>${stringCell('RINGKASAN UTAMA', 'SectionCell')}${stringCell('')}${stringCell('')}${stringCell('')}</Row>`,
+      `<Row>${stringCell('Metrik', 'HeaderCell')}${stringCell('Nilai', 'HeaderCell')}${stringCell('')}${stringCell('')}</Row>`,
+      ...summaryRows.map(([label, value]) => `<Row>${stringCell(String(label))}${numberCell(Number(value))}${stringCell('')}${stringCell('')}</Row>`),
+      `<Row ss:Height="10">${stringCell('')}${stringCell('')}${stringCell('')}${stringCell('')}</Row>`,
+      `<Row>${stringCell('INSIGHT', 'SectionCell')}${stringCell('')}${stringCell('')}${stringCell('')}</Row>`,
+      ...insightRows.map(([label, value]) => `<Row>${stringCell(String(label))}${stringCell(String(value), 'ValueCell')}${stringCell('')}${stringCell('')}</Row>`),
+      `<Row ss:Height="10">${stringCell('')}${stringCell('')}${stringCell('')}${stringCell('')}</Row>`,
+      `<Row>${stringCell('PENGELUARAN PER KATEGORI', 'SectionCell')}${stringCell('')}${stringCell('')}${stringCell('')}</Row>`,
+      `<Row>${stringCell('Kategori', 'HeaderCell')}${stringCell('Jumlah', 'HeaderCell')}${stringCell('Persentase', 'HeaderCell')}${stringCell('')}</Row>`,
+      ...(expenseByCategory.length > 0
+        ? expenseByCategory.map(c => `<Row>${stringCell(c.name)}${numberCell(c.value)}${stringCell(`${((c.value / totalExpense) * 100).toFixed(1)}%`, 'ValueCell')}${stringCell('')}</Row>`)
+        : [`<Row>${stringCell('Belum ada data', 'MutedCell')}${stringCell('-', 'MutedCell')}${stringCell('-', 'MutedCell')}${stringCell('')}</Row>`]),
+      `<Row ss:Height="10">${stringCell('')}${stringCell('')}${stringCell('')}${stringCell('')}</Row>`,
+      `<Row>${stringCell('TREN BULANAN', 'SectionCell')}${stringCell('')}${stringCell('')}${stringCell('')}</Row>`,
+      `<Row>${stringCell('Bulan', 'HeaderCell')}${stringCell('Pemasukan', 'HeaderCell')}${stringCell('Pengeluaran', 'HeaderCell')}${stringCell('')}</Row>`,
+      ...monthData.map(m => `<Row>${stringCell(m.fullName || m.name)}${numberCell(m.Pemasukan)}${numberCell(m.Pengeluaran)}${stringCell('')}</Row>`),
+      `<Row ss:Height="10">${stringCell('')}${stringCell('')}${stringCell('')}${stringCell('')}</Row>`,
+      `<Row>${stringCell('DETAIL TRANSAKSI', 'SectionCell')}${stringCell('')}${stringCell('')}${stringCell('')}</Row>`,
+      `<Row>${stringCell('Tanggal', 'HeaderCell')}${stringCell('Tipe', 'HeaderCell')}${stringCell('Deskripsi', 'HeaderCell')}${stringCell('Jumlah', 'HeaderCell')}</Row>`,
+      ...filteredTx.map(t => `<Row>${stringCell(format(new Date(t.date), 'yyyy-MM-dd'))}${stringCell(t.type)}${stringCell(t.description)}${numberCell(Number(t.amount))}</Row>`),
+    ].join('');
+
+    const workbookXml = `<?xml version="1.0"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:o="urn:schemas-microsoft-com:office:office"
+ xmlns:x="urn:schemas-microsoft-com:office:excel"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:html="http://www.w3.org/TR/REC-html40">
+  <Styles>
+    <Style ss:ID="Default" ss:Name="Normal">
+      <Alignment ss:Vertical="Center"/>
+      <Borders/>
+      <Font ss:FontName="Calibri" ss:Size="11" ss:Color="#1E293B"/>
+      <Interior/>
+      <NumberFormat/>
+      <Protection/>
+    </Style>
+    <Style ss:ID="TitleCell">
+      <Font ss:FontName="Calibri" ss:Bold="1" ss:Size="16" ss:Color="#166534"/>
+    </Style>
+    <Style ss:ID="SubtitleCell">
+      <Font ss:FontName="Calibri" ss:Size="11" ss:Color="#64748B"/>
+    </Style>
+    <Style ss:ID="SectionCell">
+      <Font ss:FontName="Calibri" ss:Bold="1" ss:Size="11" ss:Color="#FFFFFF"/>
+      <Interior ss:Color="#166534" ss:Pattern="Solid"/>
+    </Style>
+    <Style ss:ID="HeaderCell">
+      <Font ss:FontName="Calibri" ss:Bold="1" ss:Size="10" ss:Color="#0F172A"/>
+      <Interior ss:Color="#E2E8F0" ss:Pattern="Solid"/>
+      <Borders>
+        <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CBD5E1"/>
+      </Borders>
+    </Style>
+    <Style ss:ID="Cell">
+      <Borders>
+        <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#E2E8F0"/>
+      </Borders>
+    </Style>
+    <Style ss:ID="NumberCell">
+      <Borders>
+        <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#E2E8F0"/>
+      </Borders>
+      <Alignment ss:Horizontal="Right" ss:Vertical="Center"/>
+      <NumberFormat ss:Format="#,##0"/>
+    </Style>
+    <Style ss:ID="ValueCell">
+      <Borders>
+        <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#E2E8F0"/>
+      </Borders>
+      <Font ss:FontName="Calibri" ss:Size="11" ss:Color="#334155"/>
+    </Style>
+    <Style ss:ID="MutedCell">
+      <Font ss:FontName="Calibri" ss:Italic="1" ss:Size="11" ss:Color="#94A3B8"/>
+    </Style>
+  </Styles>
+  <Worksheet ss:Name="Laporan">
+    <Table>
+      <Column ss:Width="170"/>
+      <Column ss:Width="120"/>
+      <Column ss:Width="120"/>
+      <Column ss:Width="220"/>
+      ${xmlRows}
+    </Table>
+    <WorksheetOptions xmlns="urn:schemas-microsoft-com:office:excel">
+      <FreezePanes/>
+      <FrozenNoSplit/>
+      <SplitHorizontal>5</SplitHorizontal>
+      <TopRowBottomPane>5</TopRowBottomPane>
+      <ActivePane>2</ActivePane>
+      <ProtectObjects>False</ProtectObjects>
+      <ProtectScenarios>False</ProtectScenarios>
+    </WorksheetOptions>
+  </Worksheet>
+</Workbook>`;
+
+    const blob = new Blob([workbookXml], { type: 'application/vnd.ms-excel;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `Laporan_Keuangan_${selectedYear}${selectedMonth !== null ? `_${FULL_MONTH_NAMES[selectedMonth]}` : ''}.csv`;
+    link.download = `Laporan_Keuangan_${selectedYear}${selectedMonth !== null ? `_${FULL_MONTH_NAMES[selectedMonth]}` : ''}.xls`;
     link.click();
     URL.revokeObjectURL(link.href);
   };
 
   return (
     <div className="p-4 md:p-6 pb-24 md:pb-6 space-y-5 max-w-[1200px] mx-auto">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div className="flex items-center gap-3">
           {selectedMonth !== null && (
             <button
@@ -367,83 +668,95 @@ export default function Report() {
               <ArrowLeft className="w-4 h-4 text-text-primary" />
             </button>
           )}
-          <h1 className="text-lg font-bold text-text-primary">
-            {selectedMonth !== null ? `${FULL_MONTH_NAMES[selectedMonth]} ${selectedYear}` : 'Laporan Keuangan'}
-          </h1>
+          {selectedMonth !== null && (
+            <h1 className="text-lg font-bold text-text-primary">
+              {FULL_MONTH_NAMES[selectedMonth]} {selectedYear}
+            </h1>
+          )}
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={exportToPDF} className="btn btn-outline text-[12px] flex items-center gap-1.5 px-3 py-2">
-            <FileText className="w-4 h-4" /> PDF
-          </button>
-          <button onClick={exportToExcel} className="btn btn-outline text-[12px] flex items-center gap-1.5 px-3 py-2">
-            <Table className="w-4 h-4" /> Excel
-          </button>
-          <div className="relative" ref={monthPickerRef}>
-            <button
-              onClick={() => setIsMonthPickerOpen(!isMonthPickerOpen)}
-              className="bg-surface border border-line px-4 py-2.5 rounded-2xl flex items-center gap-2 shadow-sm hover:border-accent/40 transition-all font-bold text-[13px] text-text-primary justify-between group h-[46px] min-w-[120px]"
-            >
-              <span>{selectedMonth !== null ? FULL_MONTH_NAMES[selectedMonth] : 'Pilih Bulan'}</span>
-              <ChevronDown className={clsx("w-4 h-4 text-text-muted transition-transform duration-300", isMonthPickerOpen && "rotate-180")} />
-            </button>
+        <div className="flex items-center justify-between gap-2 w-full md:flex-1 md:ml-auto">
+          <div className="flex items-center gap-2 min-w-0 shrink-0">
+            <div className="relative" ref={monthPickerRef}>
+              <button
+                onClick={() => setIsMonthPickerOpen(!isMonthPickerOpen)}
+                className="bg-surface border border-line px-4 md:px-5 py-2.5 rounded-2xl flex items-center gap-2 md:gap-3 shadow-sm hover:border-accent/40 transition-all font-bold text-[12px] md:text-[13px] text-text-primary justify-between group h-[46px] min-w-[126px] md:min-w-[170px]"
+              >
+                <span>{selectedMonth !== null ? FULL_MONTH_NAMES[selectedMonth] : 'Pilih Bulan'}</span>
+                <ChevronDown className={clsx("w-4 h-4 text-text-muted transition-transform duration-300", isMonthPickerOpen && "rotate-180")} />
+              </button>
 
-            {isMonthPickerOpen && (
-              <div className="absolute top-full right-0 mt-2 z-30 w-[180px] bg-surface border border-line rounded-2xl shadow-2xl overflow-hidden animate-scale-in p-1">
-                <div className="grid grid-cols-2 gap-1 max-h-[300px] overflow-y-auto custom-scrollbar">
-                  {MONTH_NAMES.map((name, idx) => {
-                    const hasData = yearTx.some(t => new Date(t.date).getMonth() === idx);
-                    return (
+              {isMonthPickerOpen && (
+                <div className="absolute top-full left-0 mt-2 z-30 w-[180px] bg-surface border border-line rounded-2xl shadow-2xl overflow-hidden animate-scale-in p-1">
+                  <div className="grid grid-cols-2 gap-1 max-h-[300px] overflow-y-auto custom-scrollbar">
+                    {MONTH_NAMES.map((name, idx) => {
+                      const hasData = yearTx.some(t => new Date(t.date).getMonth() === idx);
+                      return (
+                        <button
+                          key={name}
+                          onClick={() => { handleMonthClick(idx); setIsMonthPickerOpen(false); }}
+                          className={clsx(
+                            "px-3 py-2.5 rounded-xl text-left text-[12px] transition-all flex items-center justify-between group",
+                            selectedMonth === idx
+                              ? "bg-accent text-white font-bold"
+                              : hasData
+                              ? "text-text-primary hover:bg-surface-hover hover:text-accent font-medium"
+                              : "text-text-muted/50 font-medium"
+                          )}
+                        >
+                          {name}
+                          {selectedMonth === idx && <div className="w-1.5 h-1.5 rounded-full bg-white opacity-80" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="relative" ref={yearPickerRef}>
+              <button
+                onClick={() => setIsYearPickerOpen(!isYearPickerOpen)}
+                className="bg-surface border border-line px-4 md:px-5 py-2.5 rounded-2xl flex items-center gap-2 md:gap-3 shadow-sm hover:border-accent/40 transition-all font-bold text-[12px] md:text-[13px] text-text-primary justify-between group h-[46px] min-w-[112px] md:min-w-[128px]"
+              >
+                <span>Tahun {selectedYear}</span>
+                <ChevronDown className={clsx("w-4 h-4 text-text-muted transition-transform duration-300", isYearPickerOpen && "rotate-180")} />
+              </button>
+
+              {isYearPickerOpen && (
+                <div className="absolute top-full left-0 mt-2 z-30 w-[160px] bg-surface border border-line rounded-2xl shadow-2xl overflow-hidden animate-scale-in p-1">
+                  <div className="grid grid-cols-1 max-h-[200px] overflow-y-auto custom-scrollbar">
+                    {availableYears.map(y => (
                       <button
-                        key={name}
-                        onClick={() => { handleMonthClick(idx); setIsMonthPickerOpen(false); }}
+                        key={y}
+                        onClick={() => { setSelectedYear(y); setIsYearPickerOpen(false); setSelectedMonth(null); }}
                         className={clsx(
-                          "px-3 py-2.5 rounded-xl text-left text-[12px] transition-all flex items-center justify-between group",
-                          selectedMonth === idx
+                          "w-full px-4 py-2.5 rounded-xl text-left text-[13px] transition-all flex items-center justify-between group",
+                          selectedYear === y
                             ? "bg-accent text-white font-bold"
-                            : hasData
-                            ? "text-text-primary hover:bg-surface-hover hover:text-accent font-medium"
-                            : "text-text-muted/50 font-medium"
+                            : "text-text-primary hover:bg-surface-hover hover:text-accent font-medium"
                         )}
                       >
-                        {name}
-                        {selectedMonth === idx && <div className="w-1.5 h-1.5 rounded-full bg-white opacity-80" />}
+                        {y}
+                        {selectedYear === y && <div className="w-1.5 h-1.5 rounded-full bg-white opacity-80" />}
                       </button>
-                    );
-                  })}
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
-          <div className="relative" ref={yearPickerRef}>
+          <div className="flex items-center justify-end gap-2 min-w-0 shrink-0">
             <button
-              onClick={() => setIsYearPickerOpen(!isYearPickerOpen)}
-              className="bg-surface border border-line px-5 py-2.5 rounded-2xl flex items-center gap-3 shadow-sm hover:border-accent/40 transition-all font-bold text-[13px] text-text-primary justify-between group h-[46px]"
+              onClick={exportToPDF}
+              className="bg-surface border border-line px-4 py-2.5 rounded-2xl flex items-center gap-2 shadow-sm hover:border-accent/40 transition-all font-bold text-[12px] md:text-[13px] text-text-primary h-[46px]"
             >
-              <span>Tahun {selectedYear}</span>
-              <ChevronDown className={clsx("w-4 h-4 text-text-muted transition-transform duration-300", isYearPickerOpen && "rotate-180")} />
+              <FileText className="w-4 h-4" /> PDF
             </button>
-
-            {isYearPickerOpen && (
-              <div className="absolute top-full right-0 mt-2 z-30 w-[160px] bg-surface border border-line rounded-2xl shadow-2xl overflow-hidden animate-scale-in p-1">
-                <div className="grid grid-cols-1 max-h-[200px] overflow-y-auto custom-scrollbar">
-                  {availableYears.map(y => (
-                    <button
-                      key={y}
-                      onClick={() => { setSelectedYear(y); setIsYearPickerOpen(false); setSelectedMonth(null); }}
-                      className={clsx(
-                        "w-full px-4 py-2.5 rounded-xl text-left text-[13px] transition-all flex items-center justify-between group",
-                        selectedYear === y
-                          ? "bg-accent text-white font-bold"
-                          : "text-text-primary hover:bg-surface-hover hover:text-accent font-medium"
-                      )}
-                    >
-                      {y}
-                      {selectedYear === y && <div className="w-1.5 h-1.5 rounded-full bg-white opacity-80" />}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
+            <button
+              onClick={exportToExcel}
+              className="bg-surface border border-line px-4 py-2.5 rounded-2xl flex items-center gap-2 shadow-sm hover:border-accent/40 transition-all font-bold text-[12px] md:text-[13px] text-text-primary h-[46px]"
+            >
+              <Table className="w-4 h-4" /> Excel
+            </button>
           </div>
         </div>
       </div>
@@ -472,14 +785,22 @@ export default function Report() {
             </div>
           </div>
           <div className="card p-4">
-            <p className="text-[10px] text-text-muted font-medium uppercase tracking-wider mb-1">Sisa / Defisit</p>
-            <p className={`text-[14px] md:text-[15px] font-bold ${summary.totalIncome - summary.totalExpense >= 0 ? 'text-success' : 'text-danger'}`}>
-              {fmt(summary.totalIncome - summary.totalExpense)}
+            <p className="text-[10px] text-text-muted font-medium uppercase tracking-wider mb-1">
+              {cashFlow.remaining >= 0 ? 'Sisa Dana' : 'Defisit'}
+            </p>
+            <p className={`text-[14px] md:text-[15px] font-bold ${cashFlow.remaining >= 0 ? 'text-success' : 'text-danger'}`}>
+              {cashFlow.remaining < 0 ? '-' : ''}{fmt(Math.abs(cashFlow.remaining))}
             </p>
             <div className="mt-1">
-              <span className={clsx("text-[10px] font-medium", savingsRate >= 20 ? 'text-success' : savingsRate >= 10 ? 'text-warning' : 'text-danger')}>
-                Tabung {savingsRate.toFixed(1)}%
-              </span>
+              {cashFlow.remaining >= 0 ? (
+                <span className="text-[10px] font-medium text-success">
+                  Sisa {cashFlow.remainingPercent.toFixed(1)}% setelah pengeluaran & tabungan
+                </span>
+              ) : (
+                <span className="text-[10px] font-medium text-danger">
+                  Pengeluaran & tabungan melebihi pemasukan
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -532,7 +853,7 @@ export default function Report() {
         {cashFlow.totalIncome > 0 && (
           <div className="card p-5 mt-4">
             <h3 className="text-[13px] font-semibold text-text-primary mb-4">Alur Uang</h3>
-            <p className="text-[10px] text-text-muted mb-4">Distribusi kemana uang Anda pergi dari total pemasukan</p>
+            <p className="text-[10px] text-text-muted mb-4">Ringkasan arus kas pada periode terpilih. Tidak termasuk saldo awal akun.</p>
 
             <div className="space-y-4">
               <div className="flex items-center gap-3">
@@ -583,48 +904,68 @@ export default function Report() {
                   </div>
                 )}
 
-                {cashFlow.remaining > 0 && (
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-success/10 flex items-center justify-center shrink-0">
-                      <span className="text-[11px] font-bold text-success">3</span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-[11px] font-medium text-text-primary">Sisa (Belum Terpakai)</span>
-                        <span className="text-[12px] font-bold text-success">{fmt(cashFlow.remaining)} <span className="text-[10px] font-normal text-text-muted">({cashFlow.remainingPercent.toFixed(1)}%)</span></span>
-                      </div>
-                      <div className="h-2 bg-surface-alt rounded-full overflow-hidden">
-                        <div className="h-full bg-success/60 rounded-full transition-all duration-500" style={{ width: `${Math.min(cashFlow.remainingPercent, 100)}%` }} />
-                      </div>
-                    </div>
+                <div className="flex items-center gap-3">
+                  <div className={clsx(
+                    "w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
+                    cashFlow.remaining >= 0 ? "bg-success/10" : "bg-danger/10"
+                  )}>
+                    <span className={clsx(
+                      "text-[11px] font-bold",
+                      cashFlow.remaining >= 0 ? "text-success" : "text-danger"
+                    )}>
+                      {cashFlow.remaining >= 0 ? '3' : '!'}
+                    </span>
                   </div>
-                )}
-
-                {cashFlow.remaining < 0 && (
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-danger/10 flex items-center justify-center shrink-0">
-                      <span className="text-[11px] font-bold text-danger">!</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[11px] font-medium text-text-primary">
+                        {cashFlow.remaining >= 0 ? 'Hasil Bersih Periode' : 'Defisit Periode'}
+                      </span>
+                      <span className={clsx(
+                        "text-[12px] font-bold",
+                        cashFlow.remaining >= 0 ? "text-success" : "text-danger"
+                      )}>
+                        {cashFlow.remaining < 0 ? '-' : ''}{fmt(Math.abs(cashFlow.remaining))}
+                        <span className="text-[10px] font-normal text-text-muted">
+                          {' '}({cashFlow.netFlowPercent.toFixed(1)}%)
+                        </span>
+                      </span>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <span className="text-[11px] text-danger font-medium">Defisit {fmt(Math.abs(cashFlow.remaining))} — Pengeluaran melebihi pemasukan</span>
+                    <div className="h-2 bg-surface-alt rounded-full overflow-hidden">
+                      <div
+                        className={clsx(
+                          "h-full rounded-full transition-all duration-500",
+                          cashFlow.remaining >= 0 ? "bg-success/60" : "bg-danger/70"
+                        )}
+                        style={{ width: `${Math.min(cashFlow.netFlowPercent, 100)}%` }}
+                      />
                     </div>
+                    <p className={clsx(
+                      "mt-1 text-[10px] font-medium",
+                      cashFlow.remaining >= 0 ? "text-success" : "text-danger"
+                    )}>
+                      {cashFlow.remaining >= 0
+                        ? 'Dana periode ini masih tersisa setelah pengeluaran dan tabungan.'
+                        : 'Pengeluaran dan tabungan periode ini melebihi total pemasukan.'}
+                    </p>
                   </div>
-                )}
+                </div>
               </div>
 
               <div className="mt-2 pt-3 border-t border-line">
-                <div className="h-4 rounded-full overflow-hidden flex bg-surface-alt">
-                  {cashFlow.expensePercent > 0 && (
-                    <div className="h-full bg-danger transition-all duration-500" style={{ width: `${Math.min(cashFlow.expensePercent, 100)}%` }} title={`Pengeluaran: ${cashFlow.expensePercent.toFixed(1)}%`} />
-                  )}
-                  {cashFlow.savingPercent > 0 && (
-                    <div className="h-full bg-accent transition-all duration-500" style={{ width: `${Math.min(cashFlow.savingPercent, 100)}%` }} title={`Tabungan: ${cashFlow.savingPercent.toFixed(1)}%`} />
-                  )}
-                  {cashFlow.remainingPercent > 0 && (
-                    <div className="h-full bg-success/60 transition-all duration-500" style={{ width: `${Math.min(cashFlow.remainingPercent, 100)}%` }} title={`Sisa: ${cashFlow.remainingPercent.toFixed(1)}%`} />
-                  )}
+                <div className="rounded-2xl border border-line bg-surface-alt/20 p-3 space-y-2">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="font-medium text-text-primary">Rumus periode</span>
+                    <span className="text-text-muted">Pemasukan - Pengeluaran - Tabungan</span>
+                  </div>
+                  <div className="text-[12px] font-semibold text-text-primary">
+                    {fmt(cashFlow.totalIncome)} - {fmt(cashFlow.totalExpense)} - {fmt(cashFlow.totalSaving)} ={' '}
+                    <span className={cashFlow.remaining >= 0 ? 'text-success' : 'text-danger'}>
+                      {cashFlow.remaining < 0 ? '-' : ''}{fmt(Math.abs(cashFlow.remaining))}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-4 mt-2">
+                <div className="flex items-center gap-4 mt-3">
                   <div className="flex items-center gap-1.5">
                     <div className="w-2.5 h-2.5 rounded-full bg-danger" />
                     <span className="text-[10px] text-text-muted">Pengeluaran</span>
@@ -633,10 +974,15 @@ export default function Report() {
                     <div className="w-2.5 h-2.5 rounded-full bg-accent" />
                     <span className="text-[10px] text-text-muted">Tabungan</span>
                   </div>
-                  {cashFlow.remainingPercent > 0 && (
+                  {cashFlow.remaining >= 0 ? (
                     <div className="flex items-center gap-1.5">
                       <div className="w-2.5 h-2.5 rounded-full bg-success/60" />
                       <span className="text-[10px] text-text-muted">Sisa</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-2.5 h-2.5 rounded-full bg-danger/70" />
+                      <span className="text-[10px] text-text-muted">Defisit</span>
                     </div>
                   )}
                 </div>
