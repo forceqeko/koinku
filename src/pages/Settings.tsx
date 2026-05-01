@@ -64,14 +64,19 @@ export default function Settings() {
   const { accounts, sources, categories, purposes, wishlists, billPurposes, refresh } = useData();
 
   const handleSave = async (data: any, isEdit: boolean) => {
-    if (!user) return;
+    if (!user) return false;
     
     let table = '';
     let payload: any = { name: data.name, user_id: user.id };
 
     if (activeTab === 'akun') {
       table = 'accounts';
-      payload.balance = data.balance;
+      payload.initial_balance = data.initialBalance;
+      if (isEdit) {
+        payload.balance = data.currentBalance;
+      } else {
+        payload.balance = data.initialBalance;
+      }
       payload.type = data.type;
       if (data.iconUrl) payload.icon_url = data.iconUrl;
     } else if (activeTab === 'sumber') {
@@ -96,13 +101,15 @@ export default function Settings() {
       if (error) throw error;
       await refresh();
       toast.success('Data berhasil disimpan!');
+      return true;
     } catch (err: any) {
       toast.error('Terjadi kesalahan: ' + err.message);
+      return false;
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!user) return;
+    if (!user) return false;
 
     const tableMap: Record<SettingTab, string> = {
       akun: 'accounts',
@@ -126,7 +133,7 @@ export default function Settings() {
         
         if (count && count > 0) {
           toast.error(`Tidak bisa hapus: Akun masih digunakan di ${count} transaksi`);
-          return;
+          return false;
         }
       } 
       else if (activeTab === 'kategori') {
@@ -138,7 +145,7 @@ export default function Settings() {
         
         if (count && count > 0) {
           toast.error(`Tidak bisa hapus: Kategori masih digunakan di ${count} transaksi`);
-          return;
+          return false;
         }
       }
       else if (activeTab === 'tujuan') {
@@ -150,7 +157,7 @@ export default function Settings() {
         
         if (count && count > 0) {
           toast.error(`Tidak bisa hapus: Tujuan masih digunakan di ${count} transaksi`);
-          return;
+          return false;
         }
       }
       else if (activeTab === 'wishlist') {
@@ -162,7 +169,7 @@ export default function Settings() {
         
         if (count && count > 0) {
           toast.error(`Tidak bisa hapus: Wishlist masih digunakan di ${count} transaksi tabungan`);
-          return;
+          return false;
         }
       }
       else if (activeTab === 'sumber') {
@@ -174,7 +181,7 @@ export default function Settings() {
         
         if (count && count > 0) {
           toast.error(`Tidak bisa hapus: Sumber masih digunakan di ${count} transaksi`);
-          return;
+          return false;
         }
       }
       else if (activeTab === 'tagihan') {
@@ -186,7 +193,7 @@ export default function Settings() {
         
         if (count && count > 0) {
           toast.error(`Tidak bisa hapus: Tagihan masih digunakan di ${count} transaksi`);
-          return;
+          return false;
         }
       }
 
@@ -194,8 +201,10 @@ export default function Settings() {
       if (error) throw error;
       await refresh();
       toast.success('Data berhasil dihapus.');
+      return true;
     } catch (err: any) {
       toast.error('Gagal menghapus: ' + err.message);
+      return false;
     }
   };
 
@@ -220,14 +229,14 @@ export default function Settings() {
 
       {/* Modern Tabs */}
       {/* Modern Tabs */}
-      <div className="px-4 md:px-6 md:px-0 md:mx-6 mt-4">
-        <div className="flex bg-surface-alt/10 dark:bg-surface-alt/40 p-1 rounded-2xl border border-line w-full overflow-x-auto no-scrollbar gap-1">
+      <div className="px-4 md:px-0 md:mx-6 mt-4">
+        <div className="flex md:grid md:grid-cols-6 bg-surface-alt/10 dark:bg-surface-alt/40 p-1 rounded-2xl border border-line w-full overflow-x-auto md:overflow-visible no-scrollbar gap-1">
           {tabs.map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={clsx(
-                "px-2 md:px-5 py-2 rounded-xl text-[11px] md:text-[12px] font-bold transition-all whitespace-nowrap uppercase tracking-wider flex-1 text-center",
+                "px-2 md:px-3 py-2 rounded-xl text-[11px] md:text-[12px] leading-tight font-bold transition-all whitespace-nowrap md:whitespace-normal uppercase md:normal-case tracking-wider md:tracking-normal flex-1 md:flex md:items-center md:justify-center text-center",
                 activeTab === tab.id
                   ? "bg-accent text-bg shadow-md shadow-accent/10 dark:shadow-accent/5"
                   : "text-text-muted hover:text-text-primary hover:bg-surface-hover"
@@ -240,12 +249,21 @@ export default function Settings() {
       </div>
 
       <div className="mt-2 min-h-[50vh]">
-        {activeTab === 'akun' && (
-          <Section title="Akun / Wallet Finansial" onAdd={() => { setEditingItem(null); setIsModalOpen(true); }}>
-             {accounts.map(a => <Item key={a.id} label={a.name} sub={typeLabel[a.type]} trailing={fmt(Number(a.balance))} iconUrl={a.icon_url || undefined} onClick={() => { setEditingItem(a); setIsModalOpen(true); }} />)}
-            {accounts.length === 0 && <p className="text-center text-sm font-medium text-text-muted py-8">Belum ada akun diatur.</p>}
-          </Section>
-        )}
+         {activeTab === 'akun' && (
+           <Section title="Akun / Wallet Finansial" onAdd={() => { setEditingItem(null); setIsModalOpen(true); }}>
+             {accounts.map(a => (
+               <Item
+                 key={a.id}
+                 label={a.name}
+                 sub={`${typeLabel[a.type]} • Saldo awal ${fmt(Number(a.initial_balance ?? a.balance ?? 0))}`}
+                 trailing={fmt(Number(a.balance))}
+                 iconUrl={a.icon_url || undefined}
+                 onClick={() => { setEditingItem(a); setIsModalOpen(true); }}
+               />
+             ))}
+             {accounts.length === 0 && <p className="text-center text-sm font-medium text-text-muted py-8">Belum ada akun diatur.</p>}
+           </Section>
+         )}
 
         {activeTab === 'sumber' && (
           <Section title="Sumber Penghasilan Anda" onAdd={() => { setEditingItem(null); setIsModalOpen(true); }}>

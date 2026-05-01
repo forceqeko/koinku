@@ -29,6 +29,7 @@ export interface BaseEntity {
 export interface Account extends BaseEntity {
   name: string;
   balance: number;
+  initial_balance?: number | null;
   type: AccountType;
   icon_url?: string | null;
 }
