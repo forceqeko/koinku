@@ -177,6 +177,22 @@ export default function Report() {
     return { totalIncome, totalExpense, totalSaving, avgMonthlyIncome, avgMonthlyExpense, topExpenseCategory, bestMonth, worstMonth, divisor };
   }, [filteredTx, expenseByCategory, monthData, selectedMonth]);
 
+  const yearAverageExpense = useMemo(() => {
+    const activeMonths = monthData.filter(m => m.Pemasukan > 0 || m.Pengeluaran > 0);
+    const divisor = Math.max(activeMonths.length, 1);
+    const yearExpenseTotal = monthData.reduce((sum, month) => sum + month.Pengeluaran, 0);
+    return yearExpenseTotal / divisor;
+  }, [monthData]);
+
+  const averageDailyExpense = useMemo(() => {
+    if (selectedMonth === null) return 0;
+    const today = new Date();
+    const isCurrentMonth = selectedYear === today.getFullYear() && selectedMonth === today.getMonth();
+    const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
+    const divisor = isCurrentMonth ? today.getDate() : daysInMonth;
+    return divisor > 0 ? summary.totalExpense / divisor : 0;
+  }, [selectedMonth, selectedYear, summary.totalExpense]);
+
   const totalExpense = expenseByCategory.reduce((a, b) => a + b.value, 0);
 
   const savingsRate = useMemo(() => {
@@ -219,6 +235,115 @@ export default function Report() {
       prevPeriodLabel,
     };
   }, [selectedMonth, selectedYear, summary, prevMonthTx, prevYearTx]);
+
+  const reportInsights = useMemo(() => {
+    const periodLabel = selectedMonth !== null ? `${FULL_MONTH_NAMES[selectedMonth]} ${selectedYear}` : `tahun ${selectedYear}`;
+    const comparisonLabel = selectedMonth !== null ? 'bulan lalu' : 'tahun lalu';
+
+    const formatChangeText = (label: string, change: number | null) => {
+      if (change === null) {
+        return {
+          tone: 'neutral' as const,
+          text: `${label} belum punya data pembanding dari ${comparisonLabel}.`,
+        };
+      }
+
+      if (Math.abs(change) < 0.1) {
+        return {
+          tone: 'neutral' as const,
+          text: `${label} relatif stabil dibanding ${comparisonLabel}.`,
+        };
+      }
+
+      const isUp = change > 0;
+      return {
+        tone: isUp ? ('up' as const) : ('down' as const),
+        text: `${label} ${isUp ? 'naik' : 'turun'} ${Math.abs(change).toFixed(1)}% dibanding ${comparisonLabel}.`,
+      };
+    };
+
+    const expenseCategoryInsight = expenseByCategory[0]
+      ? {
+          tone: 'neutral' as const,
+          text: `Kategori pengeluaran terbesar ${selectedMonth !== null ? 'bulan ini' : `di ${periodLabel}`} adalah ${expenseByCategory[0].name} sebesar ${fmt(expenseByCategory[0].value)}.`,
+        }
+      : {
+          tone: 'neutral' as const,
+          text: 'Belum ada kategori pengeluaran pada periode ini.',
+        };
+
+    const expensePurposeInsight = expenseByPurpose[0]
+      ? {
+          tone: 'neutral' as const,
+          text: `Tujuan pengeluaran terbesar adalah ${expenseByPurpose[0].name} sebesar ${fmt(expenseByPurpose[0].value)}.`,
+        }
+      : {
+          tone: 'neutral' as const,
+          text: 'Belum ada tujuan pengeluaran pada periode ini.',
+        };
+
+    const savingsInsight =
+      summary.totalIncome > 0
+        ? {
+            tone: savingsRate >= 20 ? ('up' as const) : ('neutral' as const),
+            text: `Anda menabung ${savingsRate.toFixed(1)}% dari total pemasukan ${periodLabel}.`,
+          }
+        : {
+            tone: 'neutral' as const,
+            text: `Belum ada pemasukan tercatat pada ${periodLabel}, jadi rasio tabungan belum bisa dihitung.`,
+          };
+
+    const netRemaining = summary.totalIncome - summary.totalExpense - summary.totalSaving;
+
+    const netFlowInsight =
+      netRemaining >= 0
+        ? {
+            tone: 'up' as const,
+            text: `Periode ini surplus ${fmt(netRemaining)} setelah pengeluaran dan tabungan.`,
+          }
+        : {
+            tone: 'down' as const,
+            text: `Periode ini defisit ${fmt(Math.abs(netRemaining))}. Pengeluaran dan tabungan melebihi pemasukan.`,
+          };
+
+    return [
+      {
+        title: 'Perubahan Pemasukan',
+        ...formatChangeText('Pemasukan', monthOverMonth.incomeChange),
+      },
+      {
+        title: 'Perubahan Pengeluaran',
+        ...formatChangeText('Pengeluaran', monthOverMonth.expenseChange),
+      },
+      {
+        title: 'Kategori Terbesar',
+        ...expenseCategoryInsight,
+      },
+      {
+        title: 'Tujuan Terbesar',
+        ...expensePurposeInsight,
+      },
+      {
+        title: 'Rasio Tabungan',
+        ...savingsInsight,
+      },
+      {
+        title: 'Status Arus Kas',
+        ...netFlowInsight,
+      },
+    ];
+  }, [
+    selectedMonth,
+    selectedYear,
+    monthOverMonth.incomeChange,
+    monthOverMonth.expenseChange,
+    expenseByCategory,
+    expenseByPurpose,
+    summary.totalIncome,
+    summary.totalExpense,
+    summary.totalSaving,
+    savingsRate,
+  ]);
 
   const topTransactions = useMemo(() => {
     const incomes = filteredTx
@@ -659,23 +784,16 @@ export default function Report() {
   return (
     <div className="p-4 md:p-6 pb-24 md:pb-6 space-y-5 max-w-[1200px] mx-auto">
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div className="flex items-center gap-3">
-          {selectedMonth !== null && (
-            <button
-              onClick={handleBackToYearly}
-              className="w-10 h-10 rounded-xl bg-surface border border-line flex items-center justify-center hover:bg-surface-hover hover:border-accent/40 transition-all"
-            >
-              <ArrowLeft className="w-4 h-4 text-text-primary" />
-            </button>
-          )}
-          {selectedMonth !== null && (
-            <h1 className="text-lg font-bold text-text-primary">
-              {FULL_MONTH_NAMES[selectedMonth]} {selectedYear}
-            </h1>
-          )}
-        </div>
-        <div className="flex items-center justify-between gap-2 w-full md:flex-1 md:ml-auto">
+        <div className="flex items-center justify-between gap-2 w-full md:flex-1">
           <div className="flex items-center gap-2 min-w-0 shrink-0">
+            {selectedMonth !== null && (
+              <button
+                onClick={handleBackToYearly}
+                className="w-[46px] h-[46px] rounded-2xl bg-surface border border-line flex items-center justify-center hover:bg-surface-hover hover:border-accent/40 transition-all shrink-0"
+              >
+                <ArrowLeft className="w-4 h-4 text-text-primary" />
+              </button>
+            )}
             <div className="relative" ref={monthPickerRef}>
               <button
                 onClick={() => setIsMonthPickerOpen(!isMonthPickerOpen)}
@@ -805,28 +923,72 @@ export default function Report() {
           </div>
         </div>
 
-<div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
+        <div className="card p-5 mt-4">
+          <div className="flex items-start justify-between gap-3 mb-4">
+            <div>
+              <h3 className="text-[13px] font-semibold text-text-primary">Insight Otomatis</h3>
+              <p className="text-[10px] text-text-muted mt-1">
+                Ringkasan cepat untuk membantu membaca kondisi keuangan pada periode terpilih.
+              </p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {reportInsights.map((item) => {
+              const Icon = item.tone === 'up' ? TrendingUp : item.tone === 'down' ? TrendingDown : Minus;
+              const toneClass =
+                item.tone === 'up'
+                  ? 'text-success bg-success/10 border-success/15'
+                  : item.tone === 'down'
+                    ? 'text-danger bg-danger/10 border-danger/15'
+                    : 'text-text-muted bg-surface-alt/30 border-line';
+
+              return (
+                <div key={item.title} className="rounded-2xl border border-line bg-surface-alt/10 p-4">
+                  <div className="flex items-start gap-3">
+                    <div className={clsx('w-9 h-9 rounded-xl border flex items-center justify-center shrink-0', toneClass)}>
+                      <Icon className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-semibold text-text-primary">{item.title}</p>
+                      <p className="text-[12px] text-text-secondary leading-relaxed mt-1">{item.text}</p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
           <div className="card p-3">
             <p className="text-[10px] text-text-muted font-medium">Rata-rata Masuk/Bulan</p>
             <p className="text-[12px] font-bold text-success">{fmt(summary.avgMonthlyIncome)}</p>
             {selectedMonth === null && <p className="text-[9px] text-text-muted">dari {summary.divisor} bulan berdata</p>}
           </div>
           <div className="card p-3">
-            <p className="text-[10px] text-text-muted font-medium">Rata-rata Keluar/Bulan</p>
+            <p className="text-[10px] text-text-muted font-medium">Rata-rata Pengeluaran per Bulan</p>
             <p className="text-[12px] font-bold text-danger">{fmt(summary.avgMonthlyExpense)}</p>
             {selectedMonth === null && <p className="text-[9px] text-text-muted">dari {summary.divisor} bulan berdata</p>}
           </div>
           <div className="card p-3">
-            <p className="text-[10px] text-text-muted font-medium">Rata-rata Keluar/{selectedMonth !== null ? 'Bulan' : 'Tahun'}</p>
-            <p className="text-[12px] font-bold text-danger">{fmt(summary.avgMonthlyExpense)}</p>
+            <p className="text-[10px] text-text-muted font-medium">{selectedMonth !== null ? 'Rata-rata Pengeluaran per Bulan' : 'Total Pengeluaran per Tahun'}</p>
+            <p className="text-[12px] font-bold text-danger">{fmt(selectedMonth !== null ? yearAverageExpense : summary.totalExpense)}</p>
+            {selectedMonth !== null && <p className="text-[9px] text-text-muted">rata-rata tahun {selectedYear}</p>}
           </div>
           <div className="card p-3">
-            <p className="text-[10px] text-text-muted font-medium">{selectedMonth !== null ? 'Bulan' : 'Bulan Terbaik'}</p>
-            <p className="text-[12px] font-bold text-success">{summary.bestMonth?.name || '-'}</p>
-          </div>
-          <div className="card p-3">
-            <p className="text-[10px] text-text-muted font-medium">Top Kategori</p>
-            <p className="text-[12px] font-bold text-accent truncate">{summary.topExpenseCategory}</p>
+            <p className="text-[10px] text-text-muted font-medium">
+              {selectedMonth !== null ? 'Rata-rata Pengeluaran per Hari' : 'Bulan Pengeluaran Tertinggi'}
+            </p>
+            <p className="text-[12px] font-bold text-danger">
+              {selectedMonth !== null ? fmt(averageDailyExpense) : (summary.worstMonth?.name || '-')}
+            </p>
+            {selectedMonth !== null && (
+              <p className="text-[9px] text-text-muted">
+                dibagi {selectedYear === new Date().getFullYear() && selectedMonth === new Date().getMonth()
+                  ? `${new Date().getDate()} hari berjalan`
+                  : `total ${new Date(selectedYear, selectedMonth + 1, 0).getDate()} hari`}
+              </p>
+            )}
           </div>
         </div>
 
@@ -953,12 +1115,53 @@ export default function Report() {
               </div>
 
               <div className="mt-2 pt-3 border-t border-line">
-                <div className="rounded-2xl border border-line bg-surface-alt/20 p-3 space-y-2">
-                  <div className="flex items-center justify-between text-[11px]">
-                    <span className="font-medium text-text-primary">Rumus periode</span>
-                    <span className="text-text-muted">Pemasukan - Pengeluaran - Tabungan</span>
+                <div className="rounded-2xl border border-line bg-surface-alt/20 p-3.5 space-y-3">
+                  <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
+                    <span className="text-[11px] font-semibold text-text-primary">Rumus periode</span>
+                    <span className="text-[10px] text-text-muted">Pemasukan - Pengeluaran - Tabungan = hasil bersih</span>
                   </div>
-                  <div className="text-[12px] font-semibold text-text-primary">
+
+                  <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr_auto_1fr_auto_1.1fr] gap-2 items-center">
+                    <div className="rounded-xl bg-surface border border-line px-3 py-2">
+                      <p className="text-[10px] text-text-muted font-medium">Pemasukan</p>
+                      <p className="text-[12px] font-bold text-text-primary">{fmt(cashFlow.totalIncome)}</p>
+                    </div>
+                    <div className="hidden md:flex items-center justify-center text-text-muted font-bold">-</div>
+
+                    <div className="rounded-xl bg-surface border border-line px-3 py-2">
+                      <p className="text-[10px] text-text-muted font-medium">Pengeluaran</p>
+                      <p className="text-[12px] font-bold text-text-primary">{fmt(cashFlow.totalExpense)}</p>
+                    </div>
+                    <div className="hidden md:flex items-center justify-center text-text-muted font-bold">-</div>
+
+                    <div className="rounded-xl bg-surface border border-line px-3 py-2">
+                      <p className="text-[10px] text-text-muted font-medium">Tabungan</p>
+                      <p className="text-[12px] font-bold text-text-primary">{fmt(cashFlow.totalSaving)}</p>
+                    </div>
+                    <div className="hidden md:flex items-center justify-center text-text-muted font-bold">=</div>
+
+                    <div className={clsx(
+                      'rounded-xl px-3 py-2 border',
+                      cashFlow.remaining >= 0
+                        ? 'bg-success/10 border-success/20'
+                        : 'bg-danger/10 border-danger/20'
+                    )}>
+                      <p className={clsx(
+                        'text-[10px] font-medium',
+                        cashFlow.remaining >= 0 ? 'text-success' : 'text-danger'
+                      )}>
+                        {cashFlow.remaining >= 0 ? 'Sisa Dana' : 'Defisit'}
+                      </p>
+                      <p className={clsx(
+                        'text-[12px] font-bold',
+                        cashFlow.remaining >= 0 ? 'text-success' : 'text-danger'
+                      )}>
+                        {cashFlow.remaining < 0 ? '-' : ''}{fmt(Math.abs(cashFlow.remaining))}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="md:hidden text-[11px] font-semibold text-text-primary">
                     {fmt(cashFlow.totalIncome)} - {fmt(cashFlow.totalExpense)} - {fmt(cashFlow.totalSaving)} ={' '}
                     <span className={cashFlow.remaining >= 0 ? 'text-success' : 'text-danger'}>
                       {cashFlow.remaining < 0 ? '-' : ''}{fmt(Math.abs(cashFlow.remaining))}
@@ -1154,6 +1357,12 @@ export default function Report() {
                   </div>
                 );
               })}
+            </div>
+            <div className="mt-4 pt-3 border-t border-line flex items-center justify-between">
+              <span className="text-[12px] font-semibold text-text-primary">Total</span>
+              <span className="text-[13px] font-bold text-text-primary">
+                {fmt(expenseByPurpose.reduce((sum, purpose) => sum + purpose.value, 0))}
+              </span>
             </div>
           </div>
         )}
