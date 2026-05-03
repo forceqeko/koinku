@@ -1,9 +1,7 @@
-import { Sun, Moon } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
-import { useTheme } from '../context/ThemeContext';
+import ThemeDropdown from './ThemeDropdown';
 
 export default function Topbar() {
-  const { theme, toggleTheme } = useTheme();
   const location = useLocation();
 
   const getPageTitle = () => {
@@ -19,24 +17,13 @@ export default function Topbar() {
   if (location.pathname === '/') return null;
 
   return (
-    <header className="h-[60px] flex items-center justify-between px-4 sticky top-0 z-30 bg-surface/80 backdrop-blur-md border-b border-line shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
-      {/* Left Placeholder */}
-      <div className="w-10"></div>
-      
-      {/* Centered Title */}
-      <h1 className="absolute inset-0 flex items-center justify-center text-[16px] sm:text-[17px] font-bold text-text-primary pointer-events-none -mr-1">
-        {getPageTitle()}
-      </h1>
+    <header className="sticky top-0 z-30 bg-surface/80 backdrop-blur-md border-b border-line shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
+      <div className="h-[60px] max-w-[1100px] mx-auto px-4 md:px-6 flex items-center justify-between">
+        <h1 className="text-[16px] sm:text-[17px] font-bold text-text-primary">
+          {getPageTitle()}
+        </h1>
 
-      {/* Right Actions */}
-      <div className="flex items-center z-10 w-10 justify-end">
-        <button
-          onClick={toggleTheme}
-          className="p-2.5 rounded-full text-text-muted hover:text-text-primary hover:bg-surface-hover transition-colors active:scale-95"
-          aria-label="Toggle tema"
-        >
-          {theme === 'dark' ? <Sun className="w-[20px] h-[20px]" /> : <Moon className="w-[20px] h-[20px]" />}
-        </button>
+        <ThemeDropdown className="shrink-0" iconOnly />
       </div>
     </header>
   );

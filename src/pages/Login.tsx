@@ -1,14 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useTheme } from '../context/ThemeContext';
 import { useNavigate } from 'react-router-dom';
-import { Sun, Moon, Eye, EyeOff, Mail, Lock, ArrowRight } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, ArrowRight } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { toast } from '../components/Toast';
+import ThemeDropdown from '../components/ThemeDropdown';
 
 export default function Login() {
   const { user } = useAuth();
-  const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
 
   const [isRegister, setIsRegister] = useState(false);
@@ -61,12 +60,7 @@ export default function Login() {
   return (
     <div className="min-h-screen flex flex-col bg-bg page-transition-shell">
       <div className="page-transition-stage flex-1 flex flex-col items-center justify-center px-4 py-8 relative">
-        <button
-          onClick={toggleTheme}
-          className="absolute top-5 right-5 w-10 h-10 rounded-xl bg-surface border border-line flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-surface-hover transition-all active:scale-95"
-        >
-          {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-        </button>
+        <ThemeDropdown className="absolute top-5 right-5" iconOnly />
 
         <div className="w-full max-w-[400px]">
           <div className="card p-6 shadow-lg">

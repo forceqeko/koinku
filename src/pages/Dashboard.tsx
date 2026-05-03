@@ -1,7 +1,6 @@
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
-import { useTheme } from '../context/ThemeContext';
-import { ArrowDownLeft, ArrowUpRight, Wallet, PiggyBank, Sun, Moon, Plus, Building2, Smartphone, CheckCircle, Archive, Bell, Eye, EyeOff } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, Wallet, PiggyBank, Plus, Building2, Smartphone, CheckCircle, Archive, Bell, Eye, EyeOff } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import clsx from 'clsx';
 import { format } from 'date-fns';
@@ -10,11 +9,11 @@ import { toast } from '../components/Toast';
 import { supabase } from '../lib/supabase';
 import { useState, useEffect, useRef } from 'react';
 import { fmt } from '../lib/utils';
+import ThemeDropdown from '../components/ThemeDropdown';
 
 export default function Dashboard() {
   const { accounts, wishlists, transactions, refresh } = useData();
   const { user } = useAuth();
-  const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [wishlistMenuId, setWishlistMenuId] = useState<string | null>(null);
   const [showBalance, setShowBalance] = useState(() => {
@@ -127,17 +126,15 @@ export default function Dashboard() {
                 {(user?.user_metadata?.name || user?.user_metadata?.full_name || user?.email || 'U').charAt(0).toUpperCase()}
               </div>
               <div>
-                <p className="text-sm text-bg/80 dark:text-text-muted">Hai Kamu! 👋</p>
+                <p className="text-sm text-bg/80 dark:text-text-muted">Selamat Datang! 👋</p>
                 <p className="font-semibold text-base">{user?.user_metadata?.name || user?.user_metadata?.full_name || user?.email?.split('@')[0]}</p>
               </div>
             </div>
-            <button onClick={toggleTheme} aria-label="Toggle tema" className="w-10 h-10 rounded-full bg-white/10 dark:bg-surface flex items-center justify-center backdrop-blur-sm relative border border-white/10 dark:border-line active:scale-95 transition-all group">
-               {theme === 'dark' ? (
-                 <Sun className="w-5 h-5 text-white dark:text-text-primary group-hover:text-accent transition-colors" />
-               ) : (
-                 <Moon className="w-5 h-5 text-white dark:text-text-primary group-hover:text-accent transition-colors" />
-               )}
-            </button>
+            <ThemeDropdown
+              className="shrink-0"
+              iconOnly
+              buttonClassName="bg-white/10 dark:bg-surface/80 border-white/15 dark:border-line hover:bg-white/15 dark:hover:bg-surface [color:inherit] [&_.theme-dropdown-icon]:bg-white/20 [&_.theme-dropdown-icon]:text-[var(--primary-foreground)] dark:[&_.theme-dropdown-icon]:bg-accent/10 dark:[&_.theme-dropdown-icon]:text-accent"
+            />
           </div>
 
           {/* Main Balance */}

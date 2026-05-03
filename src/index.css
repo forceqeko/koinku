@@ -71,6 +71,62 @@
   --page-transition-ease: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+[data-theme="celestial-blue"] {
+  --background: oklch(1.0000 0 0);
+  --foreground: oklch(0 0 0);
+  --card: oklch(0.9784 0.0011 197.1387);
+  --card-foreground: oklch(0.2435 0 0);
+  --popover: oklch(1.0000 0 0);
+  --popover-foreground: oklch(0.3171 0 0);
+  --primary: oklch(0.8012 0.1089 201.1736);
+  --primary-foreground: oklch(0 0 0);
+  --secondary: oklch(0.2435 0 0);
+  --secondary-foreground: oklch(1.0000 0 0);
+  --muted: oklch(0.9683 0.0069 247.8956);
+  --muted-foreground: oklch(0.3171 0 0);
+  --accent: oklch(0.9392 0.0166 250.8453);
+  --accent-foreground: oklch(0.3171 0 0);
+  --destructive: oklch(0.6188 0.2376 25.7658);
+  --destructive-foreground: oklch(1.0000 0 0);
+  --border: oklch(0.9317 0.0118 231.6594);
+  --input: oklch(0.9809 0.0025 228.7836);
+  --ring: oklch(0.8012 0.1089 201.1736);
+  --chart-1: oklch(0.8012 0.1089 201.1736);
+  --chart-2: oklch(0.6907 0.1554 160.3454);
+  --chart-3: oklch(0.8214 0.1600 82.5337);
+  --chart-4: oklch(0.7064 0.1822 151.7125);
+  --chart-5: oklch(0.5919 0.2186 10.5826);
+
+  --color-bg: var(--background);
+  --color-surface: var(--card);
+  --color-surface-hover: var(--accent);
+  --color-surface-alt: var(--muted);
+  --color-border: var(--border);
+  --color-border-hover: var(--primary);
+  --color-text-primary: var(--foreground);
+  --color-text-secondary: var(--muted-foreground);
+  --color-text-muted: var(--muted-foreground);
+  --color-accent: var(--primary);
+  --color-accent-hover: oklch(0.72 0.10 201.1736);
+  --color-accent-muted: oklch(0.8012 0.1089 201.1736 / 0.12);
+  --color-success-muted: oklch(0.6907 0.1554 160.3454 / 0.12);
+  --color-danger-muted: oklch(0.6188 0.2376 25.7658 / 0.12);
+  --color-warning-muted: oklch(0.8214 0.1600 82.5337 / 0.14);
+
+  --color-sidebar-bg: oklch(0.9784 0.0011 197.1387);
+  --color-sidebar-fg: oklch(0 0 0);
+  --color-sidebar-border: oklch(0.9271 0.0101 238.5177);
+  --color-sidebar-active: oklch(0.9057 0.0680 201.7766);
+  --color-sidebar-active-fg: oklch(0.3171 0 0);
+  --color-sidebar-muted: oklch(0.3171 0 0);
+
+  --shadow-sm: 0px 12px 30px 0px hsl(203 90% 35% / 0.08), 0px 1px 2px -1px hsl(203 90% 35% / 0.08);
+  --shadow-md: 0px 12px 30px 0px hsl(203 90% 35% / 0.08), 0px 2px 4px -1px hsl(203 90% 35% / 0.08);
+  --shadow-lg: 0px 12px 30px 0px hsl(203 90% 35% / 0.10), 0px 4px 6px -1px hsl(203 90% 35% / 0.10);
+  --shadow-xl: 0px 12px 30px 0px hsl(203 90% 35% / 0.12), 0px 8px 10px -1px hsl(203 90% 35% / 0.12);
+  --shadow-2xl: 0px 12px 30px 0px hsl(203 90% 35% / 0.18);
+}
+
 /* ─── Dark ──────────────────────────────────── */
 .dark {
   --background: oklch(0.1375 0.0104 165.2256);
@@ -224,10 +280,30 @@
     position: relative;
     box-shadow: var(--shadow-lg);
   }
+  [data-theme="celestial-blue"] .header-hero {
+    background-color: var(--color-sidebar-active);
+    color: var(--color-sidebar-active-fg);
+    border-bottom: 1px solid var(--color-sidebar-border);
+  }
   .dark .header-hero {
-    background-color: var(--color-surface);
-    color: var(--foreground);
+    background-color: var(--color-sidebar-active);
+    color: var(--color-sidebar-fg);
+    border-bottom: 1px solid var(--color-sidebar-border);
     box-shadow: var(--shadow-xl);
+  }
+
+  [data-theme="celestial-blue"] .card {
+    background-color: color-mix(in oklab, var(--color-surface) 96%, var(--color-accent) 4%);
+    border-color: color-mix(in oklab, var(--color-border) 92%, var(--color-accent) 8%);
+  }
+
+  [data-theme="celestial-blue"] .btn-secondary:hover,
+  [data-theme="celestial-blue"] .btn-ghost:hover {
+    background-color: color-mix(in oklab, var(--color-surface-hover) 72%, white 28%);
+  }
+
+  [data-theme="celestial-blue"] .input:focus {
+    box-shadow: 0 0 0 1px color-mix(in oklab, var(--primary) 82%, white 18%);
   }
 
   .badge {

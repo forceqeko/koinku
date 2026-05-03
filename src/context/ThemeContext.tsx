@@ -1,10 +1,32 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
-type Theme = 'light' | 'dark';
+export type Theme = 'green-yellow' | 'black-green' | 'celestial-blue';
+
+export const themeOptions = [
+  {
+    id: 'green-yellow' as const,
+    label: 'Green and Yellow',
+    description: 'Tema terang bawaan dengan aksen hijau hangat.',
+    isDark: false,
+  },
+  {
+    id: 'black-green' as const,
+    label: 'Black Green',
+    description: 'Tema gelap dengan kontras hijau yang tegas.',
+    isDark: true,
+  },
+  {
+    id: 'celestial-blue' as const,
+    label: 'Celestial Blue',
+    description: 'Tema terang bernuansa biru yang lebih tenang.',
+    isDark: false,
+  },
+];
 
 interface ThemeContextType {
   theme: Theme;
-  toggleTheme: () => void;
+  setTheme: (theme: Theme) => void;
+  themes: typeof themeOptions;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
@@ -12,24 +34,22 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<Theme>(() => {
     const saved = localStorage.getItem('fintrack_theme');
-    if (saved === 'dark' || saved === 'light') return saved;
-    // Default to dark if user prefers
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    if (saved === 'green-yellow' || saved === 'black-green' || saved === 'celestial-blue') return saved;
+    if (saved === 'dark') return 'black-green';
+    if (saved === 'light') return 'green-yellow';
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'black-green' : 'green-yellow';
   });
 
   useEffect(() => {
     const root = window.document.documentElement;
-    root.classList.remove('light', 'dark');
-    root.classList.add(theme);
+    const activeTheme = themeOptions.find((item) => item.id === theme);
+    root.dataset.theme = theme;
+    root.classList.toggle('dark', !!activeTheme?.isDark);
     localStorage.setItem('fintrack_theme', theme);
   }, [theme]);
 
-  const toggleTheme = () => {
-    setTheme((prev) => (prev === 'light' ? 'dark' : 'light'));
-  };
-
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme }}>
+    <ThemeContext.Provider value={{ theme, setTheme, themes: themeOptions }}>
       {children}
     </ThemeContext.Provider>
   );
