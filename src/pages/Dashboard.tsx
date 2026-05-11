@@ -91,8 +91,14 @@ export default function Dashboard() {
     .filter(t => t.type === 'income')
     .reduce((acc, t) => acc + Number(t.amount), 0);
 
+  // Admin fee on transfer/saving is a real outflow from the source account,
+  // so it must count toward monthly expense. No separate "expense" row is
+  // created for fees anymore; we derive it from the parent row's field.
   const expense = currentMonthTx.reduce((acc, t) => {
     if (t.type === 'expense' || t.type === 'bill') return acc + Number(t.amount);
+    if ((t.type === 'transfer' || t.type === 'saving') && t.admin_fee) {
+      return acc + Number(t.admin_fee);
+    }
     return acc;
   }, 0);
 

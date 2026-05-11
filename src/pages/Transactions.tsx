@@ -5,7 +5,6 @@ import clsx from 'clsx';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
 import { useData } from '../context/DataContext';
-import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { toast } from '../components/Toast';
 import { fmt } from '../lib/utils';
@@ -56,7 +55,6 @@ export default function Transactions() {
   const yearPickerRef = useRef<HTMLDivElement>(null);
 
   const { transactions, accounts, wishlists, categories, purposes, billPurposes, refresh, loading } = useData();
-  const { user } = useAuth();
 
   const months = [
     'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
@@ -260,56 +258,9 @@ export default function Transactions() {
     );
   };
 
-  // ── Helper: Atomically adjust account balance via RPC ──
-  const adjustBalance = async (accountId: string, delta: number) => {
-    const { error } = await supabase.rpc('adjust_account_balance', {
-      account_id: accountId,
-      delta,
-    });
-    if (error) throw new Error('Sinkronisasi saldo gagal: ' + error.message);
-  };
-
-  const adjustWishlist = async (wishlistId: string, delta: number) => {
-    const { error } = await supabase.rpc('adjust_wishlist_amount', {
-      wl_id: wishlistId,
-      delta,
-    });
-    if (error) throw new Error('Sinkronisasi wishlist gagal: ' + error.message);
-  };
-
-  // ── Helper: Apply balance changes for a transaction (atomic) ──
-  const applyBalanceChanges = async (tx: Transaction, direction: 'apply' | 'reverse') => {
-    if (!user) return;
-    const mult = direction === 'apply' ? 1 : -1;
-    const amt = Number(tx.amount) * mult;
-    const fee = Number(tx.admin_fee || 0) * mult;
-
-    if (tx.type === 'income') {
-      if (!tx.to_account_id) throw new Error('Akun tujuan wajib dipilih untuk pemasukan');
-      await adjustBalance(tx.to_account_id, amt);
-    } 
-    else if (tx.type === 'expense' || tx.type === 'bill') {
-      if (!tx.from_account_id) throw new Error('Akun sumber wajib dipilih untuk pengeluaran');
-      await adjustBalance(tx.from_account_id, -amt);
-    }
-    else if (tx.type === 'transfer' || tx.type === 'saving') {
-      if (!tx.from_account_id) throw new Error('Akun sumber wajib dipilih');
-      if (!tx.to_account_id) throw new Error('Akun tujuan wajib dipilih');
-      if (tx.from_account_id === tx.to_account_id) throw new Error('Akun sumber dan tujuan tidak boleh sama');
-      await adjustBalance(tx.from_account_id, -(amt + fee));
-      await adjustBalance(tx.to_account_id, amt);
-    }
-
-    if (tx.type === 'saving' && tx.wishlist_id) {
-      await adjustWishlist(tx.wishlist_id, amt);
-    }
-  };
-
+  // ── Create via atomic RPC. Single round-trip, rollback handled by Postgres. ──
   const handleAddTransaction = async (txData: Partial<Transaction>) => {
-    let insertedTxId: string | null = null;
-    
     try {
-      // Point 14: Client-side validation before sending to server
       const validation = validateTransaction(txData);
       if (!validation.isValid) {
         const errorMsg = validation.errors.map(e => e.message).join(', ');
@@ -317,61 +268,21 @@ export default function Transactions() {
         return;
       }
 
-      // Insert transaction
-      const { data: insertedData, error: insertError } = await supabase
-        .from('transactions')
-        .insert([{ ...txData, user_id: user?.id }])
-        .select('id')
-        .single();
-      
-      if (insertError) throw insertError;
-      insertedTxId = insertedData?.id;
-
-      // Apply balance changes with rollback on failure
-      try {
-        await applyBalanceChanges(txData as Transaction, 'apply');
-      } catch (balanceError: any) {
-        // Rollback: Delete the inserted transaction
-        if (insertedTxId) {
-          await supabase.from('transactions').delete().eq('id', insertedTxId);
-        }
-        throw balanceError;
-      }
-
-      // Auto-create expense for admin fee
-      if ((txData.type === 'transfer' || txData.type === 'saving') && Number(txData.admin_fee) > 0) {
-        const { data: cats } = await supabase.from('expense_categories').select('id').eq('name', 'Kebutuhan Lainnya').limit(1);
-        const { data: purps } = await supabase.from('expense_purposes').select('id').eq('name', 'Admin').limit(1);
-        if (cats?.length && purps?.length) {
-          await supabase.from('transactions').insert([{
-            user_id: user?.id, date: txData.date, type: 'expense',
-            description: `Biaya Admin - ${txData.description}`,
-            amount: Number(txData.admin_fee),
-            from_account_id: txData.from_account_id,
-            category_id: cats[0].id, purpose_id: purps[0].id,
-          }]);
-        }
-      }
+      const { error } = await supabase.rpc('create_transaction_atomic', {
+        payload: txData as Record<string, unknown>,
+      });
+      if (error) throw error;
 
       await refresh();
       toast.success('Transaksi berhasil ditambahkan!');
     } catch (err: any) {
-      // Rollback if transaction was inserted but something else failed
-      if (insertedTxId) {
-        await supabase.from('transactions').delete().eq('id', insertedTxId);
-        await refresh();
-      }
       toast.error('Gagal: ' + err.message);
     }
   };
 
+  // ── Edit via atomic RPC. ──
   const handleEditTransaction = async (id: string, txData: Partial<Transaction>) => {
-    let updateFailed = false;
-    const oldTx = transactions.find(t => t.id === id);
-    if (!oldTx) return;
-
     try {
-      // Point 14: Client-side validation before sending to server
       const validation = validateTransaction(txData);
       if (!validation.isValid) {
         const errorMsg = validation.errors.map(e => e.message).join(', ');
@@ -379,55 +290,26 @@ export default function Transactions() {
         return;
       }
 
-      // 1. Revert old transaction balances
-      await applyBalanceChanges(oldTx, 'reverse');
-
-      // 2. Update transaction in DB
-      const { error } = await supabase.from('transactions').update(txData).eq('id', id);
-      if (error) {
-        updateFailed = true;
-        throw error;
-      }
-
-      // 3. Apply new transaction balances with rollback on failure
-      try {
-        await applyBalanceChanges({ ...oldTx, ...txData } as Transaction, 'apply');
-      } catch (balanceError: any) {
-        // Rollback: Restore old transaction data
-        await supabase.from('transactions').update(oldTx).eq('id', id);
-        await applyBalanceChanges(oldTx, 'apply'); // Re-apply old balances
-        throw balanceError;
-      }
+      const { error } = await supabase.rpc('update_transaction_atomic', {
+        tx_id: id,
+        payload: txData as Record<string, unknown>,
+      });
+      if (error) throw error;
 
       await refresh();
       toast.success('Transaksi berhasil diperbarui!');
     } catch (err: any) {
-      if (!updateFailed) {
-        // Try to restore balances if update failed but revert succeeded
-        await applyBalanceChanges(oldTx, 'apply');
-      }
       toast.error('Gagal: ' + err.message);
     }
   };
 
+  // ── Delete via atomic RPC (soft delete + balance reverse, all in one). ──
   const handleDeleteTransaction = async (tx: Transaction) => {
     try {
-      // Point 16: Use soft delete instead of hard delete
-      const { error } = await supabase.rpc('soft_delete_transaction', {
-        tx_id: tx.id
+      const { error } = await supabase.rpc('delete_transaction_atomic', {
+        tx_id: tx.id,
       });
-      if (error) {
-        throw error;
-      }
-
-      // Reverse balance changes with rollback on failure
-      try {
-        await applyBalanceChanges(tx, 'reverse');
-      } catch (balanceError: any) {
-        // Rollback: Restore the transaction
-        await supabase.from('transactions').update({ deleted_at: null }).eq('id', tx.id);
-        throw balanceError;
-      }
+      if (error) throw error;
 
       await refresh();
       toast.success('Transaksi berhasil dihapus.');

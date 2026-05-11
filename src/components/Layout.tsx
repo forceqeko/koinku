@@ -4,7 +4,6 @@ import Sidebar, { navItems } from './Sidebar';
 import Topbar from './Topbar';
 import TransactionModal from './TransactionModal';
 import { useData } from '../context/DataContext';
-import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { toast } from './Toast';
 import clsx from 'clsx';
@@ -13,98 +12,23 @@ import { Plus } from 'lucide-react';
 export default function Layout() {
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const { refresh } = useData();
-  const { user } = useAuth();
   const location = useLocation();
 
-  const adjustBalance = async (accountId: string, delta: number) => {
-    const { error } = await supabase.rpc('adjust_account_balance', { account_id: accountId, delta });
-    if (error) throw new Error(error.message);
-  };
-
-  const adjustWishlist = async (wishlistId: string, delta: number) => {
-    const { error } = await supabase.rpc('adjust_wishlist_amount', { wl_id: wishlistId, delta });
-    if (error) throw new Error(error.message);
-  };
-
-  const applyBalanceChanges = async (tx: any) => {
-    const amt = Number(tx.amount);
-    const fee = Number(tx.admin_fee || 0);
-
-    if (tx.type === 'income') {
-      if (!tx.to_account_id) throw new Error('Akun tujuan wajib dipilih untuk pemasukan');
-      await adjustBalance(tx.to_account_id, amt);
-    } else if (tx.type === 'expense') {
-      if (!tx.from_account_id) throw new Error('Akun sumber wajib dipilih untuk pengeluaran');
-      await adjustBalance(tx.from_account_id, -amt);
-    } else if (tx.type === 'transfer' || tx.type === 'saving') {
-      if (!tx.from_account_id) throw new Error('Akun sumber wajib dipilih');
-      if (!tx.to_account_id) throw new Error('Akun tujuan wajib dipilih');
-      await adjustBalance(tx.from_account_id, -(amt + fee));
-      await adjustBalance(tx.to_account_id, amt);
-    }
-
-    if (tx.type === 'saving' && tx.wishlist_id) {
-      await adjustWishlist(tx.wishlist_id, amt);
-    }
-  };
-
-  const handleQuickAdd = async (txData: any) => {
-    let insertedTxId: string | null = null;
-    
+  const handleQuickAdd = async (txData: Record<string, unknown>) => {
     try {
-      // 1. Validate before insert
       if (!txData.type) throw new Error('Tipe transaksi wajib dipilih');
       if (!txData.amount || Number(txData.amount) <= 0) throw new Error('Jumlah harus lebih dari 0');
-      if (!txData.description?.trim()) throw new Error('Deskripsi wajib diisi');
+      const description = typeof txData.description === 'string' ? txData.description.trim() : '';
+      if (!description) throw new Error('Deskripsi wajib diisi');
 
-      // 2. Insert transaction
-      const { data: insertedData, error: insertError } = await supabase
-        .from('transactions')
-        .insert([{ ...txData, user_id: user?.id }])
-        .select('id')
-        .single();
-      
-      if (insertError) throw insertError;
-      insertedTxId = insertedData?.id;
-
-      // 3. Apply balance changes with rollback on failure
-      try {
-        await applyBalanceChanges(txData);
-      } catch (balanceError: any) {
-        // Rollback: Delete the inserted transaction
-        if (insertedTxId) {
-          await supabase.from('transactions').delete().eq('id', insertedTxId);
-        }
-        throw balanceError;
-      }
-
-      // 4. Auto-create expense for admin fee
-      if ((txData.type === 'transfer' || txData.type === 'saving') && Number(txData.admin_fee) > 0) {
-        const { data: cats } = await supabase.from('expense_categories').select('id').eq('name', 'Kebutuhan Lainnya').limit(1);
-        const { data: purps } = await supabase.from('expense_purposes').select('id').eq('name', 'Admin').limit(1);
-        
-        if (cats?.length && purps?.length) {
-          await supabase.from('transactions').insert([{
-            user_id: user?.id,
-            date: txData.date,
-            type: 'expense',
-            description: `Biaya Admin - ${txData.description}`,
-            amount: Number(txData.admin_fee),
-            from_account_id: txData.from_account_id,
-            category_id: cats[0].id,
-            purpose_id: purps[0].id,
-          }]);
-        }
-      }
+      const { error } = await supabase.rpc('create_transaction_atomic', {
+        payload: txData,
+      });
+      if (error) throw error;
 
       await refresh();
       toast.success('Transaksi berhasil ditambahkan!');
     } catch (err: any) {
-      // Rollback if transaction was inserted but something else failed
-      if (insertedTxId) {
-        await supabase.from('transactions').delete().eq('id', insertedTxId);
-        await refresh();
-      }
       toast.error('Gagal: ' + err.message);
     }
   };

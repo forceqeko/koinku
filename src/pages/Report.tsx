@@ -12,6 +12,17 @@ import { fmt } from '../lib/utils';
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
 const FULL_MONTH_NAMES = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 
+// Admin fees on transfers/savings are real outflows. We count them as
+// expense without creating separate rows (Opsi A admin-fee model).
+const ADMIN_FEE_BUCKET = 'Biaya Admin';
+const expenseAmount = (t: { type: string; amount: number | string; admin_fee?: number | string | null }) => {
+  if (t.type === 'expense' || t.type === 'bill') return Number(t.amount);
+  if ((t.type === 'transfer' || t.type === 'saving') && t.admin_fee) return Number(t.admin_fee);
+  return 0;
+};
+const sumExpense = (list: { type: string; amount: number | string; admin_fee?: number | string | null }[]) =>
+  list.reduce((sum, t) => sum + expenseAmount(t), 0);
+
 export default function Report() {
   const { transactions, categories, purposes, accounts } = useData();
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -89,10 +100,7 @@ export default function Report() {
         const income = mTx
           .filter(t => t.type === 'income')
           .reduce((sum, t) => sum + Number(t.amount), 0);
-        const expense = mTx.reduce((sum, t) => {
-          if (t.type === 'expense' || t.type === 'bill') return sum + Number(t.amount);
-          return sum;
-        }, 0);
+        const expense = sumExpense(mTx);
         return { name, fullName: FULL_MONTH_NAMES[idx], month: idx, isSelected, Pemasukan: income, Pengeluaran: expense };
       });
       return result;
@@ -103,10 +111,7 @@ export default function Report() {
       const income = monthTx
         .filter(t => t.type === 'income')
         .reduce((sum, t) => sum + Number(t.amount), 0);
-      const expense = monthTx.reduce((sum, t) => {
-        if (t.type === 'expense' || t.type === 'bill') return sum + Number(t.amount);
-        return sum;
-      }, 0);
+      const expense = sumExpense(monthTx);
       return { name, fullName: FULL_MONTH_NAMES[idx], month: idx, isSelected: false, Pemasukan: income, Pengeluaran: expense };
     });
 
@@ -122,13 +127,23 @@ export default function Report() {
 
   const expenseByCategory = useMemo(() => {
     const categoryMap = new Map<string, number>();
+    let adminFeeTotal = 0;
     filteredTx.forEach(t => {
       if (t.type === 'expense' && t.category_id) {
         const cat = categories.find((c: any) => c.id === t.category_id);
         const catName = cat?.name || 'Lainnya';
         categoryMap.set(catName, (categoryMap.get(catName) || 0) + Number(t.amount));
+      } else if (t.type === 'bill') {
+        // Bills were already counted in summary.totalExpense, so include
+        // them here to keep category totals consistent with summary.
+        categoryMap.set('Tagihan', (categoryMap.get('Tagihan') || 0) + Number(t.amount));
+      } else if ((t.type === 'transfer' || t.type === 'saving') && t.admin_fee) {
+        adminFeeTotal += Number(t.admin_fee);
       }
     });
+    if (adminFeeTotal > 0) {
+      categoryMap.set(ADMIN_FEE_BUCKET, adminFeeTotal);
+    }
     return Array.from(categoryMap.entries())
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value);
@@ -136,13 +151,21 @@ export default function Report() {
 
   const expenseByPurpose = useMemo(() => {
     const purposeMap = new Map<string, number>();
+    let adminFeeTotal = 0;
     filteredTx.forEach(t => {
       if (t.type === 'expense' && t.purpose_id) {
         const pur = purposes.find((p: any) => p.id === t.purpose_id);
         const purName = pur?.name || 'Lainnya';
         purposeMap.set(purName, (purposeMap.get(purName) || 0) + Number(t.amount));
+      } else if (t.type === 'bill') {
+        purposeMap.set('Tagihan', (purposeMap.get('Tagihan') || 0) + Number(t.amount));
+      } else if ((t.type === 'transfer' || t.type === 'saving') && t.admin_fee) {
+        adminFeeTotal += Number(t.admin_fee);
       }
     });
+    if (adminFeeTotal > 0) {
+      purposeMap.set(ADMIN_FEE_BUCKET, adminFeeTotal);
+    }
     return Array.from(purposeMap.entries())
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value);
@@ -150,10 +173,7 @@ export default function Report() {
 
   const summary = useMemo(() => {
     const totalIncome = filteredTx.filter(t => t.type === 'income').reduce((sum, t) => sum + Number(t.amount), 0);
-    const totalExpense = filteredTx.reduce((sum, t) => {
-      if (t.type === 'expense' || t.type === 'bill') return sum + Number(t.amount);
-      return sum;
-    }, 0);
+    const totalExpense = sumExpense(filteredTx);
     const totalSaving = filteredTx.filter(t => t.type === 'saving').reduce((sum, t) => sum + Number(t.amount), 0);
 
     let divisor: number;
@@ -209,18 +229,12 @@ export default function Report() {
     const prevPeriodSummary = selectedMonth !== null
       ? {
           totalIncome: prevMonthTx.filter(t => t.type === 'income').reduce((sum, t) => sum + Number(t.amount), 0),
-          totalExpense: prevMonthTx.reduce((sum, t) => {
-            if (t.type === 'expense' || t.type === 'bill') return sum + Number(t.amount);
-            return sum;
-          }, 0),
+          totalExpense: sumExpense(prevMonthTx),
           totalSaving: prevMonthTx.filter(t => t.type === 'saving').reduce((sum, t) => sum + Number(t.amount), 0),
         }
       : {
           totalIncome: prevYearTx.filter(t => t.type === 'income').reduce((sum, t) => sum + Number(t.amount), 0),
-          totalExpense: prevYearTx.reduce((sum, t) => {
-            if (t.type === 'expense' || t.type === 'bill') return sum + Number(t.amount);
-            return sum;
-          }, 0),
+          totalExpense: sumExpense(prevYearTx),
           totalSaving: prevYearTx.filter(t => t.type === 'saving').reduce((sum, t) => sum + Number(t.amount), 0),
         };
 
