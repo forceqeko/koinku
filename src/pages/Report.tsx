@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, XAxis, YAxis, Tooltip, Legend, LineChart, Line } from 'recharts';
-import { ChevronDown, FileText, Table, ArrowLeft, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { ChevronDown, ChevronUp, FileText, Table, ArrowLeft, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import clsx from 'clsx';
 import { useData } from '../context/DataContext';
 import jsPDF from 'jspdf';
@@ -29,6 +29,7 @@ export default function Report() {
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
   const [isYearPickerOpen, setIsYearPickerOpen] = useState(false);
   const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
+  const [showAllPurposes, setShowAllPurposes] = useState(false);
   const yearPickerRef = useRef<HTMLDivElement>(null);
   const monthPickerRef = useRef<HTMLDivElement>(null);
   const reportRef = useRef<HTMLDivElement>(null);
@@ -45,6 +46,10 @@ export default function Report() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    setShowAllPurposes(false);
+  }, [selectedMonth, selectedYear]);
 
   const handleMonthClick = (monthIdx: number) => {
     setSelectedMonth(monthIdx);
@@ -1347,12 +1352,19 @@ export default function Report() {
 
         {expenseByPurpose.length > 0 && (
           <div className="card p-5 mt-4">
-            <h3 className="text-[13px] font-semibold text-text-primary mb-1">Rincian per Tujuan Pengeluaran</h3>
-            {selectedMonth !== null && (
-              <p className="text-[10px] text-text-muted mb-3">Periode: {FULL_MONTH_NAMES[selectedMonth]} {selectedYear}</p>
-            )}
-            <div className="space-y-3">
-              {expenseByPurpose.slice(0, 8).map((p, idx) => {
+            <div className="flex items-start justify-between gap-3 mb-1">
+              <div>
+                <h3 className="text-[13px] font-semibold text-text-primary">Rincian per Tujuan Pengeluaran</h3>
+                {selectedMonth !== null && (
+                  <p className="text-[10px] text-text-muted mt-0.5">Periode: {FULL_MONTH_NAMES[selectedMonth]} {selectedYear}</p>
+                )}
+              </div>
+              <span className="text-[10px] font-medium text-text-muted bg-surface-alt px-2 py-0.5 rounded-full whitespace-nowrap">
+                {expenseByPurpose.length} tujuan
+              </span>
+            </div>
+            <div className="space-y-3 mt-3">
+              {(showAllPurposes ? expenseByPurpose : expenseByPurpose.slice(0, 8)).map((p, idx) => {
                 const percent = totalExpense > 0 ? (p.value / totalExpense) * 100 : 0;
                 return (
                   <div key={p.name} className="flex items-center gap-3">
@@ -1372,6 +1384,26 @@ export default function Report() {
                 );
               })}
             </div>
+            {expenseByPurpose.length > 8 && (
+              <button
+                type="button"
+                onClick={() => setShowAllPurposes((prev) => !prev)}
+                aria-expanded={showAllPurposes}
+                className="mt-4 w-full flex items-center justify-center gap-1.5 px-3 py-2 text-[12px] font-semibold text-accent bg-accent/5 hover:bg-accent/10 border border-accent/20 rounded-xl transition-all active:scale-[0.98]"
+              >
+                {showAllPurposes ? (
+                  <>
+                    Sembunyikan
+                    <ChevronUp className="w-3.5 h-3.5" />
+                  </>
+                ) : (
+                  <>
+                    Tampilkan semua ({expenseByPurpose.length - 8} lainnya)
+                    <ChevronDown className="w-3.5 h-3.5" />
+                  </>
+                )}
+              </button>
+            )}
             <div className="mt-4 pt-3 border-t border-line flex items-center justify-between">
               <span className="text-[12px] font-semibold text-text-primary">Total</span>
               <span className="text-[13px] font-bold text-text-primary">
