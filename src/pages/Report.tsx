@@ -445,9 +445,14 @@ export default function Report() {
   const heatMonthLabel = `${FULL_MONTH_NAMES[heatmapMonth]} ${heatmapYear}`;
 
   const heatStats = useMemo(() => {
+    const today = new Date();
+    const isCurrentMonth = heatmapData.year === today.getFullYear() && heatmapData.month === today.getMonth();
+    const todayDay = today.getDate();
+
     const allDays: { day: number; amount: number }[] = [];
     heatmapData.weeks.flat().forEach(day => {
       if (day === null) return;
+      if (isCurrentMonth && day > todayDay) return;
       const key = `${String(heatmapData.year).padStart(4, '0')}-${String(heatmapData.month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
       const amount = dailySpending.lookup.get(key) ?? 0;
       allDays.push({ day, amount });
@@ -494,6 +499,10 @@ export default function Report() {
   }, [heatmapData, dailySpending.lookup, dailySpending.maxAmount]);
 
   const heatTotal = heatStats.total;
+
+  const isCurrentHeatMonth = heatmapYear === new Date().getFullYear() && heatmapMonth === new Date().getMonth();
+  const heatPeriodDays = isCurrentHeatMonth ? new Date().getDate() : heatmapData.daysInMonth;
+  const heatRemainingDays = isCurrentHeatMonth ? heatmapData.daysInMonth - new Date().getDate() : 0;
 
   const cashFlow = useMemo(() => {
     const totalIncome = summary.totalIncome;
@@ -1142,15 +1151,18 @@ export default function Report() {
                       if (day === null) return <div key={di} className="aspect-square" />;
                       const today = new Date();
                       const isToday = heatmapYear === today.getFullYear() && heatmapMonth === today.getMonth() && day === today.getDate();
+                      const isFuture = heatmapYear === today.getFullYear() && heatmapMonth === today.getMonth() && day > today.getDate();
                       return (
                         <div
                           key={di}
-                          title={amount !== null ? `${day} ${heatMonthLabel}: ${fmt(amount ?? 0)}` : ''}
-                          style={heatStyle(tier)}
+                          title={isFuture ? `${day} ${heatMonthLabel} — belum terjadi` : `${day} ${heatMonthLabel}: ${fmt(amount ?? 0)}`}
+                          style={isFuture ? { background: 'var(--color-surface-alt)', color: 'var(--color-text-muted)', opacity: 0.4 } : heatStyle(tier)}
                           className={clsx(
-                            'aspect-square rounded-lg flex items-center justify-center text-[11px] md:text-[12px] font-semibold transition-all cursor-default hover:scale-110 hover:shadow-md',
+                            'aspect-square rounded-lg flex items-center justify-center text-[11px] md:text-[12px] font-semibold transition-all cursor-default',
+                            !isFuture && 'hover:scale-110 hover:shadow-md',
                             tier === 0 && 'border border-line',
-                            isToday && 'ring-2 ring-accent ring-offset-1 dark:ring-offset-surface'
+                            isToday && 'ring-2 ring-accent ring-offset-1 dark:ring-offset-surface',
+                            isFuture && 'border border-dashed border-line'
                           )}
                         >
                           {day}
@@ -1195,6 +1207,7 @@ export default function Report() {
                 <div className="rounded-xl bg-surface-alt/40 border border-line px-3 py-2.5">
                   <p className="text-[9px] text-text-muted font-medium uppercase tracking-wider">Rata-rata / Hari Aktif</p>
                   <p className="text-[14px] md:text-[15px] font-bold text-text-primary mt-0.5 truncate">{fmt(heatStats.avgPerDay)}</p>
+                  <p className="text-[9px] text-text-muted mt-0.5">{heatStats.activeDaysCount} hari berdata</p>
                 </div>
                 <div className="rounded-xl bg-surface-alt/40 border border-line px-3 py-2.5">
                   <p className="text-[9px] text-text-muted font-medium uppercase tracking-wider">Pengeluaran Puncak</p>
@@ -1208,9 +1221,12 @@ export default function Report() {
                 <div className="rounded-xl bg-surface-alt/40 border border-line px-3 py-2.5">
                   <p className="text-[9px] text-text-muted font-medium uppercase tracking-wider">Hari Aktif</p>
                   <p className="text-[14px] md:text-[15px] font-bold text-text-primary mt-0.5">
-                    {heatStats.activeDaysCount}<span className="text-[11px] font-medium text-text-muted">/{heatStats.totalDays}</span>
+                    {heatStats.activeDaysCount}<span className="text-[11px] font-medium text-text-muted">/{heatPeriodDays}</span>
                   </p>
-                  <p className="text-[9px] text-text-muted mt-0.5">{heatStats.zeroDays} hari tanpa pengeluaran</p>
+                  <p className="text-[9px] text-text-muted mt-0.5">
+                    {heatStats.zeroDays} hari tanpa pengeluaran
+                    {heatRemainingDays > 0 && <span className="ml-0.5">• {heatRemainingDays} hari tersisa</span>}
+                  </p>
                 </div>
               </div>
 
