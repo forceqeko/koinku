@@ -49,6 +49,18 @@
   --color-danger-muted: oklch(0.6368 0.2078 25.3313 / 0.12);
   --color-warning-muted: rgba(251, 191, 36, 0.12);
 
+  /* Heatmap palette (derived from theme accent) */
+  --heat-0-bg: oklch(0.95 0.005 91.4 / 0.55);
+  --heat-0-fg: var(--color-text-muted);
+  --heat-1-bg: oklch(0.92 0.06 149.18);
+  --heat-1-fg: oklch(0.38 0.10 149.18);
+  --heat-2-bg: oklch(0.84 0.12 149.18);
+  --heat-2-fg: oklch(0.28 0.10 149.18);
+  --heat-3-bg: oklch(0.78 0.16 91.96);
+  --heat-3-fg: oklch(0.30 0.10 91.96);
+  --heat-4-bg: oklch(0.66 0.20 35);
+  --heat-4-fg: oklch(0.98 0.01 91.4);
+
   /* Sidebar */
   --color-sidebar-bg: var(--sidebar, oklch(0.2566 0.0300 161.5403));
   --color-sidebar-fg: var(--sidebar-foreground, oklch(0.9870 0.0031 91.4370));
@@ -113,6 +125,18 @@
   --color-danger-muted: oklch(0.6188 0.2376 25.7658 / 0.12);
   --color-warning-muted: oklch(0.8214 0.1600 82.5337 / 0.14);
 
+  /* Heatmap palette - celestial blue */
+  --heat-0-bg: oklch(0.95 0.01 230 / 0.55);
+  --heat-0-fg: var(--color-text-muted);
+  --heat-1-bg: oklch(0.92 0.06 201.17);
+  --heat-1-fg: oklch(0.40 0.10 201.17);
+  --heat-2-bg: oklch(0.82 0.11 201.17);
+  --heat-2-fg: oklch(0.25 0.08 201.17);
+  --heat-3-bg: oklch(0.78 0.15 82.53);
+  --heat-3-fg: oklch(0.30 0.10 82.53);
+  --heat-4-bg: oklch(0.62 0.22 10.58);
+  --heat-4-fg: oklch(1 0 0);
+
   --color-sidebar-bg: oklch(0.9784 0.0011 197.1387);
   --color-sidebar-fg: oklch(0 0 0);
   --color-sidebar-border: oklch(0.9271 0.0101 238.5177);
@@ -167,6 +191,21 @@
   --color-accent: var(--primary);
   --color-accent-hover: oklch(0.85 0.20 149.5172);
   --color-accent-muted: oklch(0.7763 0.2066 149.5172 / 0.12);
+  --color-success-muted: oklch(0.7763 0.2066 149.52 / 0.18);
+  --color-danger-muted: oklch(0.5875 0.2303 28.26 / 0.20);
+  --color-warning-muted: oklch(0.8512 0.1670 93.13 / 0.18);
+
+  /* Heatmap palette - dark theme */
+  --heat-0-bg: oklch(0.25 0.02 162.74 / 0.55);
+  --heat-0-fg: var(--color-text-muted);
+  --heat-1-bg: oklch(0.34 0.10 149.52);
+  --heat-1-fg: oklch(0.86 0.14 149.52);
+  --heat-2-bg: oklch(0.48 0.16 149.52);
+  --heat-2-fg: oklch(0.95 0.05 149.52);
+  --heat-3-bg: oklch(0.58 0.16 93.13);
+  --heat-3-fg: oklch(0.14 0.01 165.23);
+  --heat-4-bg: oklch(0.56 0.22 28.26);
+  --heat-4-fg: oklch(1 0 0);
 
   /* Sidebar Dark */
   --color-sidebar-bg: var(--sidebar, oklch(0.1215 0.0119 165.2505));

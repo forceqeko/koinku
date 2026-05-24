@@ -1,6 +1,6 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect, CSSProperties } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, XAxis, YAxis, Tooltip, Legend, LineChart, Line } from 'recharts';
-import { ChevronDown, ChevronUp, FileText, Table, ArrowLeft, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { ChevronDown, ChevronUp, FileText, Table, ArrowLeft, TrendingUp, TrendingDown, Minus, ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
 import clsx from 'clsx';
 import { useData } from '../context/DataContext';
 import jsPDF from 'jspdf';
@@ -30,6 +30,8 @@ export default function Report() {
   const [isYearPickerOpen, setIsYearPickerOpen] = useState(false);
   const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
   const [showAllPurposes, setShowAllPurposes] = useState(false);
+  const [heatmapYear, setHeatmapYear] = useState(new Date().getFullYear());
+  const [heatmapMonth, setHeatmapMonth] = useState(new Date().getMonth());
   const yearPickerRef = useRef<HTMLDivElement>(null);
   const monthPickerRef = useRef<HTMLDivElement>(null);
   const reportRef = useRef<HTMLDivElement>(null);
@@ -377,6 +379,121 @@ export default function Report() {
 
     return { incomes, expenses };
   }, [filteredTx]);
+
+  const dailySpending = useMemo(() => {
+    const map = new Map<string, number>();
+    filteredTx.forEach(t => {
+      const key = format(new Date(t.date), 'yyyy-MM-dd');
+      map.set(key, (map.get(key) || 0) + expenseAmount(t));
+    });
+    const entries = Array.from(map.entries()).map(([date, amount]) => ({ date, amount }));
+    const maxAmount = entries.length > 0 ? Math.max(...entries.map(e => e.amount)) : 0;
+    return { entries, maxAmount, lookup: map };
+  }, [filteredTx]);
+
+  const heatmapData = useMemo(() => {
+    const year = heatmapYear;
+    const month = heatmapMonth;
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const firstDayOfWeek = new Date(year, month, 1).getDay();
+    const startOffset = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1;
+    const weeks: (number | null)[][] = [];
+    let currentWeek: (number | null)[] = [];
+    for (let i = 0; i < startOffset; i++) {
+      currentWeek.push(null);
+    }
+    for (let day = 1; day <= daysInMonth; day++) {
+      currentWeek.push(day);
+      if (currentWeek.length === 7) {
+        weeks.push(currentWeek);
+        currentWeek = [];
+      }
+    }
+    if (currentWeek.length > 0) {
+      while (currentWeek.length < 7) {
+        currentWeek.push(null);
+      }
+      weeks.push(currentWeek);
+    }
+    return { year, month, weeks, daysInMonth };
+  }, [heatmapYear, heatmapMonth]);
+
+  const getHeatAmount = (day: number | null) => {
+    if (day === null) return null;
+    const key = `${String(heatmapData.year).padStart(4, '0')}-${String(heatmapData.month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    return dailySpending.lookup.get(key) ?? 0;
+  };
+
+  const heatTier = (amount: number | null): 0 | 1 | 2 | 3 | 4 | -1 => {
+    if (amount === null) return -1;
+    if (amount === 0) return 0;
+    const ratio = dailySpending.maxAmount > 0 ? amount / dailySpending.maxAmount : 0;
+    if (ratio < 0.25) return 1;
+    if (ratio < 0.5) return 2;
+    if (ratio < 0.75) return 3;
+    return 4;
+  };
+
+  const heatStyle = (tier: number): CSSProperties => {
+    if (tier === -1) return { background: 'transparent' };
+    return {
+      backgroundColor: `var(--heat-${tier}-bg)`,
+      color: `var(--heat-${tier}-fg)`,
+    };
+  };
+
+  const heatMonthLabel = `${FULL_MONTH_NAMES[heatmapMonth]} ${heatmapYear}`;
+
+  const heatStats = useMemo(() => {
+    const allDays: { day: number; amount: number }[] = [];
+    heatmapData.weeks.flat().forEach(day => {
+      if (day === null) return;
+      const key = `${String(heatmapData.year).padStart(4, '0')}-${String(heatmapData.month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const amount = dailySpending.lookup.get(key) ?? 0;
+      allDays.push({ day, amount });
+    });
+    const total = allDays.reduce((sum, d) => sum + d.amount, 0);
+    const activeDays = allDays.filter(d => d.amount > 0);
+    const avgPerDay = activeDays.length > 0 ? total / activeDays.length : 0;
+    const peakDay = allDays.reduce((max, d) => (d.amount > max.amount ? d : max), { day: 0, amount: 0 });
+
+    // Weekday vs Weekend
+    let weekdayTotal = 0, weekendTotal = 0, weekdayCount = 0, weekendCount = 0;
+    allDays.forEach(({ day, amount }) => {
+      const dow = new Date(heatmapData.year, heatmapData.month, day).getDay();
+      const isWeekend = dow === 0 || dow === 6;
+      if (isWeekend) { weekendTotal += amount; if (amount > 0) weekendCount++; }
+      else { weekdayTotal += amount; if (amount > 0) weekdayCount++; }
+    });
+    const avgWeekday = weekdayCount > 0 ? weekdayTotal / weekdayCount : 0;
+    const avgWeekend = weekendCount > 0 ? weekendTotal / weekendCount : 0;
+
+    // Bucket distribution
+    let zeroDays = 0, lowDays = 0, midDays = 0, highDays = 0;
+    allDays.forEach(({ amount }) => {
+      if (amount === 0) { zeroDays++; return; }
+      const ratio = dailySpending.maxAmount > 0 ? amount / dailySpending.maxAmount : 0;
+      if (ratio < 0.25) lowDays++;
+      else if (ratio < 0.75) midDays++;
+      else highDays++;
+    });
+
+    return {
+      total,
+      avgPerDay,
+      activeDaysCount: activeDays.length,
+      totalDays: allDays.length,
+      peakDay,
+      avgWeekday,
+      avgWeekend,
+      zeroDays,
+      lowDays,
+      midDays,
+      highDays,
+    };
+  }, [heatmapData, dailySpending.lookup, dailySpending.maxAmount]);
+
+  const heatTotal = heatStats.total;
 
   const cashFlow = useMemo(() => {
     const totalIncome = summary.totalIncome;
@@ -978,6 +1095,203 @@ export default function Report() {
           </div>
         </div>
 
+        <div className="card p-5 mt-4">
+          <div className="flex items-start justify-between gap-3 mb-1">
+            <div>
+              <h3 className="text-[13px] font-semibold text-text-primary flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-accent" />
+                Kalender Pengeluaran
+              </h3>
+              <p className="text-[10px] text-text-muted mt-0.5">Intensitas pengeluaran harian • Total {heatMonthLabel}: <span className="font-semibold text-text-primary">{fmt(heatTotal)}</span></p>
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => {
+                  if (heatmapMonth === 0) { setHeatmapMonth(11); setHeatmapYear(y => y - 1); }
+                  else setHeatmapMonth(m => m - 1);
+                }}
+                className="w-8 h-8 rounded-xl border border-line bg-surface flex items-center justify-center hover:bg-surface-hover transition-all"
+              >
+                <ChevronLeft className="w-3.5 h-3.5 text-text-muted" />
+              </button>
+              <button
+                onClick={() => {
+                  if (heatmapMonth === 11) { setHeatmapMonth(0); setHeatmapYear(y => y + 1); }
+                  else setHeatmapMonth(m => m + 1);
+                }}
+                className="w-8 h-8 rounded-xl border border-line bg-surface flex items-center justify-center hover:bg-surface-hover transition-all"
+              >
+                <ChevronRight className="w-3.5 h-3.5 text-text-muted" />
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-5 md:gap-6 mt-2">
+            <div className="min-w-0">
+              <div className="grid grid-cols-7 text-center mb-1.5">
+                {['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'].map(d => (
+                  <span key={d} className="text-[10px] text-text-muted font-medium py-0.5">{d}</span>
+                ))}
+              </div>
+              <div className="space-y-1 md:space-y-1.5">
+                {heatmapData.weeks.map((week, wi) => (
+                  <div key={wi} className="grid grid-cols-7 gap-1 md:gap-1.5">
+                    {week.map((day, di) => {
+                      const amount = getHeatAmount(day);
+                      const tier = heatTier(amount);
+                      if (day === null) return <div key={di} className="aspect-square" />;
+                      const today = new Date();
+                      const isToday = heatmapYear === today.getFullYear() && heatmapMonth === today.getMonth() && day === today.getDate();
+                      return (
+                        <div
+                          key={di}
+                          title={amount !== null ? `${day} ${heatMonthLabel}: ${fmt(amount ?? 0)}` : ''}
+                          style={heatStyle(tier)}
+                          className={clsx(
+                            'aspect-square rounded-lg flex items-center justify-center text-[11px] md:text-[12px] font-semibold transition-all cursor-default hover:scale-110 hover:shadow-md',
+                            tier === 0 && 'border border-line',
+                            isToday && 'ring-2 ring-accent ring-offset-1 dark:ring-offset-surface'
+                          )}
+                        >
+                          {day}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex items-center flex-wrap gap-x-3 gap-y-1.5 mt-4 pt-3 border-t border-line">
+                <span className="text-[9px] text-text-muted font-medium uppercase tracking-wider mr-1">Skala</span>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 rounded-[4px] border border-line" style={{ background: 'var(--heat-0-bg)' }} />
+                  <span className="text-[10px] text-text-muted">0</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 rounded-[4px]" style={{ background: 'var(--heat-1-bg)' }} />
+                  <span className="text-[10px] text-text-muted">Rendah</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 rounded-[4px]" style={{ background: 'var(--heat-2-bg)' }} />
+                  <span className="text-[10px] text-text-muted">Cukup</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 rounded-[4px]" style={{ background: 'var(--heat-3-bg)' }} />
+                  <span className="text-[10px] text-text-muted">Sedang</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 rounded-[4px]" style={{ background: 'var(--heat-4-bg)' }} />
+                  <span className="text-[10px] text-text-muted">Tinggi</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-3 min-w-0">
+              <div className="grid grid-cols-2 gap-2.5">
+                <div className="rounded-xl bg-gradient-to-br from-accent/10 to-accent/5 border border-accent/20 px-3 py-2.5">
+                  <p className="text-[9px] text-text-muted font-medium uppercase tracking-wider">Total Bulan Ini</p>
+                  <p className="text-[14px] md:text-[15px] font-bold text-text-primary mt-0.5 truncate">{fmt(heatStats.total)}</p>
+                </div>
+                <div className="rounded-xl bg-surface-alt/40 border border-line px-3 py-2.5">
+                  <p className="text-[9px] text-text-muted font-medium uppercase tracking-wider">Rata-rata / Hari Aktif</p>
+                  <p className="text-[14px] md:text-[15px] font-bold text-text-primary mt-0.5 truncate">{fmt(heatStats.avgPerDay)}</p>
+                </div>
+                <div className="rounded-xl bg-surface-alt/40 border border-line px-3 py-2.5">
+                  <p className="text-[9px] text-text-muted font-medium uppercase tracking-wider">Pengeluaran Puncak</p>
+                  <p className="text-[13px] md:text-[14px] font-bold text-danger mt-0.5 truncate">
+                    {heatStats.peakDay.amount > 0 ? fmt(heatStats.peakDay.amount) : '-'}
+                  </p>
+                  <p className="text-[9px] text-text-muted mt-0.5">
+                    {heatStats.peakDay.amount > 0 ? `tanggal ${heatStats.peakDay.day}` : 'belum ada data'}
+                  </p>
+                </div>
+                <div className="rounded-xl bg-surface-alt/40 border border-line px-3 py-2.5">
+                  <p className="text-[9px] text-text-muted font-medium uppercase tracking-wider">Hari Aktif</p>
+                  <p className="text-[14px] md:text-[15px] font-bold text-text-primary mt-0.5">
+                    {heatStats.activeDaysCount}<span className="text-[11px] font-medium text-text-muted">/{heatStats.totalDays}</span>
+                  </p>
+                  <p className="text-[9px] text-text-muted mt-0.5">{heatStats.zeroDays} hari tanpa pengeluaran</p>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-line bg-surface-alt/20 px-3 py-2.5">
+                <p className="text-[10px] text-text-muted font-medium uppercase tracking-wider mb-2">Distribusi Intensitas</p>
+                <div className="flex h-2 rounded-full overflow-hidden bg-surface-alt/40">
+                  {heatStats.totalDays > 0 && (
+                    <>
+                      <div style={{ width: `${(heatStats.zeroDays / heatStats.totalDays) * 100}%`, background: 'var(--heat-0-bg)' }} />
+                      <div style={{ width: `${(heatStats.lowDays / heatStats.totalDays) * 100}%`, background: 'var(--heat-1-bg)' }} />
+                      <div style={{ width: `${(heatStats.midDays / heatStats.totalDays) * 100}%`, background: 'var(--heat-3-bg)' }} />
+                      <div style={{ width: `${(heatStats.highDays / heatStats.totalDays) * 100}%`, background: 'var(--heat-4-bg)' }} />
+                    </>
+                  )}
+                </div>
+                <div className="grid grid-cols-4 gap-1 mt-2 text-center">
+                  <div>
+                    <p className="text-[10px] font-bold text-text-primary">{heatStats.zeroDays}</p>
+                    <p className="text-[9px] text-text-muted">Nol</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold" style={{ color: 'var(--heat-2-bg)' }}>{heatStats.lowDays}</p>
+                    <p className="text-[9px] text-text-muted">Rendah</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold" style={{ color: 'var(--heat-3-bg)' }}>{heatStats.midDays}</p>
+                    <p className="text-[9px] text-text-muted">Sedang</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold" style={{ color: 'var(--heat-4-bg)' }}>{heatStats.highDays}</p>
+                    <p className="text-[9px] text-text-muted">Tinggi</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-line bg-surface-alt/20 px-3 py-2.5">
+                <p className="text-[10px] text-text-muted font-medium uppercase tracking-wider mb-2">Hari Kerja vs Akhir Pekan</p>
+                <div className="space-y-2">
+                  <div>
+                    <div className="flex justify-between text-[11px] mb-1">
+                      <span className="text-text-secondary">Hari Kerja</span>
+                      <span className="font-semibold text-text-primary">{fmt(heatStats.avgWeekday)}<span className="text-[9px] text-text-muted font-normal"> /hari</span></span>
+                    </div>
+                    <div className="h-1.5 bg-surface-alt/50 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-accent rounded-full transition-all"
+                        style={{ width: `${Math.max(heatStats.avgWeekday, heatStats.avgWeekend) > 0 ? (heatStats.avgWeekday / Math.max(heatStats.avgWeekday, heatStats.avgWeekend)) * 100 : 0}%` }}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex justify-between text-[11px] mb-1">
+                      <span className="text-text-secondary">Akhir Pekan</span>
+                      <span className="font-semibold text-text-primary">{fmt(heatStats.avgWeekend)}<span className="text-[9px] text-text-muted font-normal"> /hari</span></span>
+                    </div>
+                    <div className="h-1.5 bg-surface-alt/50 rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all"
+                        style={{
+                          width: `${Math.max(heatStats.avgWeekday, heatStats.avgWeekend) > 0 ? (heatStats.avgWeekend / Math.max(heatStats.avgWeekday, heatStats.avgWeekend)) * 100 : 0}%`,
+                          background: 'var(--chart-2)',
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+                {heatStats.avgWeekend > heatStats.avgWeekday && heatStats.avgWeekday > 0 && (
+                  <p className="text-[10px] text-text-muted mt-2 leading-snug">
+                    Anda cenderung lebih boros di akhir pekan, rata-rata {((heatStats.avgWeekend / heatStats.avgWeekday - 1) * 100).toFixed(0)}% lebih tinggi.
+                  </p>
+                )}
+                {heatStats.avgWeekday > heatStats.avgWeekend && heatStats.avgWeekend > 0 && (
+                  <p className="text-[10px] text-text-muted mt-2 leading-snug">
+                    Pengeluaran lebih banyak terjadi pada hari kerja.
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
           <div className="card p-3">
             <p className="text-[10px] text-text-muted font-medium">Rata-rata Masuk/Bulan</p>
@@ -1286,7 +1600,7 @@ export default function Report() {
                     <Line
                       type="monotone"
                       dataKey="Pemasukan"
-                      stroke="#22c55e"
+                      stroke="var(--chart-1)"
                       strokeWidth={2}
                       dot={{ r: 4 }}
                       activeDot={{ r: 6 }}
@@ -1294,7 +1608,7 @@ export default function Report() {
                     <Line
                       type="monotone"
                       dataKey="Pengeluaran"
-                      stroke="#ef4444"
+                      stroke="var(--chart-5)"
                       strokeWidth={2}
                       dot={{ r: 4 }}
                       activeDot={{ r: 6 }}
@@ -1368,7 +1682,7 @@ export default function Report() {
                 const percent = totalExpense > 0 ? (p.value / totalExpense) * 100 : 0;
                 return (
                   <div key={p.name} className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center text-[11px] font-bold text-white" style={{ backgroundColor: COLORS[idx % COLORS.length].replace('var(--', 'rgba(').replace(')', ', 1)') }}>
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center text-[11px] font-bold text-white" style={{ backgroundColor: COLORS[idx % COLORS.length] }}>
                       #{idx + 1}
                     </div>
                     <div className="flex-1">
@@ -1377,7 +1691,7 @@ export default function Report() {
                         <span className="text-text-muted">{fmt(p.value)} <span className="text-[10px]">({percent.toFixed(1)}%)</span></span>
                       </div>
                       <div className="h-2 bg-surface-alt rounded-full overflow-hidden">
-                        <div className="h-full rounded-full transition-all duration-500" style={{ width: `${percent}%`, backgroundColor: COLORS[idx % COLORS.length].startsWith('var') ? '#3b82f6' : COLORS[idx % COLORS.length] }} />
+                        <div className="h-full rounded-full transition-all duration-500" style={{ width: `${percent}%`, backgroundColor: COLORS[idx % COLORS.length] }} />
                       </div>
                     </div>
                   </div>
