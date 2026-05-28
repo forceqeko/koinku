@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef, useEffect, CSSProperties } from 'react';
-import { PieChart, Pie, Cell, ResponsiveContainer, XAxis, YAxis, Tooltip, Legend, LineChart, Line } from 'recharts';
-import { ChevronDown, ChevronUp, FileText, Table, ArrowLeft, TrendingUp, TrendingDown, Minus, ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { PieChart, Pie, Cell, ResponsiveContainer, XAxis, YAxis, Tooltip, Legend, LineChart, Line, BarChart, Bar } from 'recharts';
+import { ChevronDown, ChevronUp, FileText, Table, TrendingUp, TrendingDown, Minus, ChevronLeft, ChevronRight, Calendar, X } from 'lucide-react';
 import clsx from 'clsx';
 import { useData } from '../context/DataContext';
 import jsPDF from 'jspdf';
@@ -23,15 +24,41 @@ const expenseAmount = (t: { type: string; amount: number | string; admin_fee?: n
 const sumExpense = (list: { type: string; amount: number | string; admin_fee?: number | string | null }[]) =>
   list.reduce((sum, t) => sum + expenseAmount(t), 0);
 
+const CustomXAxisTick = (props: any) => {
+  const { x, y, payload } = props;
+  const value = payload.value;
+  const match = value.match(/(Mng \d+) \((.+)\)/);
+  if (match) {
+    const weekLabel = match[1].replace('Mng', 'Minggu');
+    const dateLabel = `(${match[2]})`;
+    return (
+      <g transform={`translate(${x},${y})`}>
+        <text x={0} y={0} textAnchor="middle">
+          <tspan x={0} dy={10} fontSize={10} fontWeight="bold" fill="var(--color-text-primary)">{weekLabel}</tspan>
+          <tspan x={0} dy={12} fontSize={9} fontWeight="normal" fill="var(--color-text-muted)">{dateLabel}</tspan>
+        </text>
+      </g>
+    );
+  }
+  return (
+    <g transform={`translate(${x},${y})`}>
+      <text x={0} y={0} dy={10} textAnchor="middle" fill="var(--color-text-muted)" fontSize={10}>
+        {value}
+      </text>
+    </g>
+  );
+};
+
 export default function Report() {
   const { transactions, categories, purposes, accounts } = useData();
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState<number | null>(new Date().getMonth());
   const [isYearPickerOpen, setIsYearPickerOpen] = useState(false);
   const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
   const [showAllPurposes, setShowAllPurposes] = useState(false);
   const [heatmapYear, setHeatmapYear] = useState(new Date().getFullYear());
   const [heatmapMonth, setHeatmapMonth] = useState(new Date().getMonth());
+  const [calendarDetailDate, setCalendarDetailDate] = useState<string | null>(null);
   const yearPickerRef = useRef<HTMLDivElement>(null);
   const monthPickerRef = useRef<HTMLDivElement>(null);
   const reportRef = useRef<HTMLDivElement>(null);
@@ -51,14 +78,24 @@ export default function Report() {
 
   useEffect(() => {
     setShowAllPurposes(false);
+
+    // Sinkronisasi otomatis bulan/tahun Kalender Pengeluaran (Saran 2)
+    if (selectedMonth !== null) {
+      setHeatmapMonth(selectedMonth);
+      setHeatmapYear(selectedYear);
+    } else {
+      const today = new Date();
+      if (selectedYear === today.getFullYear()) {
+        setHeatmapMonth(today.getMonth());
+      } else {
+        setHeatmapMonth(11); // Desember
+      }
+      setHeatmapYear(selectedYear);
+    }
   }, [selectedMonth, selectedYear]);
 
   const handleMonthClick = (monthIdx: number) => {
     setSelectedMonth(monthIdx);
-  };
-
-  const handleBackToYearly = () => {
-    setSelectedMonth(null);
   };
 
   const COLORS = [
@@ -235,15 +272,15 @@ export default function Report() {
 
     const prevPeriodSummary = selectedMonth !== null
       ? {
-          totalIncome: prevMonthTx.filter(t => t.type === 'income').reduce((sum, t) => sum + Number(t.amount), 0),
-          totalExpense: sumExpense(prevMonthTx),
-          totalSaving: prevMonthTx.filter(t => t.type === 'saving').reduce((sum, t) => sum + Number(t.amount), 0),
-        }
+        totalIncome: prevMonthTx.filter(t => t.type === 'income').reduce((sum, t) => sum + Number(t.amount), 0),
+        totalExpense: sumExpense(prevMonthTx),
+        totalSaving: prevMonthTx.filter(t => t.type === 'saving').reduce((sum, t) => sum + Number(t.amount), 0),
+      }
       : {
-          totalIncome: prevYearTx.filter(t => t.type === 'income').reduce((sum, t) => sum + Number(t.amount), 0),
-          totalExpense: sumExpense(prevYearTx),
-          totalSaving: prevYearTx.filter(t => t.type === 'saving').reduce((sum, t) => sum + Number(t.amount), 0),
-        };
+        totalIncome: prevYearTx.filter(t => t.type === 'income').reduce((sum, t) => sum + Number(t.amount), 0),
+        totalExpense: sumExpense(prevYearTx),
+        totalSaving: prevYearTx.filter(t => t.type === 'saving').reduce((sum, t) => sum + Number(t.amount), 0),
+      };
 
     const prevPeriodLabel = selectedMonth !== null
       ? `${FULL_MONTH_NAMES[selectedMonth === 0 ? 11 : selectedMonth - 1]} ${selectedMonth === 0 ? selectedYear - 1 : selectedYear}`
@@ -256,115 +293,6 @@ export default function Report() {
       prevPeriodLabel,
     };
   }, [selectedMonth, selectedYear, summary, prevMonthTx, prevYearTx]);
-
-  const reportInsights = useMemo(() => {
-    const periodLabel = selectedMonth !== null ? `${FULL_MONTH_NAMES[selectedMonth]} ${selectedYear}` : `tahun ${selectedYear}`;
-    const comparisonLabel = selectedMonth !== null ? 'bulan lalu' : 'tahun lalu';
-
-    const formatChangeText = (label: string, change: number | null) => {
-      if (change === null) {
-        return {
-          tone: 'neutral' as const,
-          text: `${label} belum punya data pembanding dari ${comparisonLabel}.`,
-        };
-      }
-
-      if (Math.abs(change) < 0.1) {
-        return {
-          tone: 'neutral' as const,
-          text: `${label} relatif stabil dibanding ${comparisonLabel}.`,
-        };
-      }
-
-      const isUp = change > 0;
-      return {
-        tone: isUp ? ('up' as const) : ('down' as const),
-        text: `${label} ${isUp ? 'naik' : 'turun'} ${Math.abs(change).toFixed(1)}% dibanding ${comparisonLabel}.`,
-      };
-    };
-
-    const expenseCategoryInsight = expenseByCategory[0]
-      ? {
-          tone: 'neutral' as const,
-          text: `Kategori pengeluaran terbesar ${selectedMonth !== null ? 'bulan ini' : `di ${periodLabel}`} adalah ${expenseByCategory[0].name} sebesar ${fmt(expenseByCategory[0].value)}.`,
-        }
-      : {
-          tone: 'neutral' as const,
-          text: 'Belum ada kategori pengeluaran pada periode ini.',
-        };
-
-    const expensePurposeInsight = expenseByPurpose[0]
-      ? {
-          tone: 'neutral' as const,
-          text: `Tujuan pengeluaran terbesar adalah ${expenseByPurpose[0].name} sebesar ${fmt(expenseByPurpose[0].value)}.`,
-        }
-      : {
-          tone: 'neutral' as const,
-          text: 'Belum ada tujuan pengeluaran pada periode ini.',
-        };
-
-    const savingsInsight =
-      summary.totalIncome > 0
-        ? {
-            tone: savingsRate >= 20 ? ('up' as const) : ('neutral' as const),
-            text: `Anda menabung ${savingsRate.toFixed(1)}% dari total pemasukan ${periodLabel}.`,
-          }
-        : {
-            tone: 'neutral' as const,
-            text: `Belum ada pemasukan tercatat pada ${periodLabel}, jadi rasio tabungan belum bisa dihitung.`,
-          };
-
-    const netRemaining = summary.totalIncome - summary.totalExpense - summary.totalSaving;
-
-    const netFlowInsight =
-      netRemaining >= 0
-        ? {
-            tone: 'up' as const,
-            text: `Periode ini surplus ${fmt(netRemaining)} setelah pengeluaran dan tabungan.`,
-          }
-        : {
-            tone: 'down' as const,
-            text: `Periode ini defisit ${fmt(Math.abs(netRemaining))}. Pengeluaran dan tabungan melebihi pemasukan.`,
-          };
-
-    return [
-      {
-        title: 'Perubahan Pemasukan',
-        ...formatChangeText('Pemasukan', monthOverMonth.incomeChange),
-      },
-      {
-        title: 'Perubahan Pengeluaran',
-        ...formatChangeText('Pengeluaran', monthOverMonth.expenseChange),
-      },
-      {
-        title: 'Kategori Terbesar',
-        ...expenseCategoryInsight,
-      },
-      {
-        title: 'Tujuan Terbesar',
-        ...expensePurposeInsight,
-      },
-      {
-        title: 'Rasio Tabungan',
-        ...savingsInsight,
-      },
-      {
-        title: 'Status Arus Kas',
-        ...netFlowInsight,
-      },
-    ];
-  }, [
-    selectedMonth,
-    selectedYear,
-    monthOverMonth.incomeChange,
-    monthOverMonth.expenseChange,
-    expenseByCategory,
-    expenseByPurpose,
-    summary.totalIncome,
-    summary.totalExpense,
-    summary.totalSaving,
-    savingsRate,
-  ]);
 
   const topTransactions = useMemo(() => {
     const incomes = filteredTx
@@ -390,6 +318,108 @@ export default function Report() {
     const maxAmount = entries.length > 0 ? Math.max(...entries.map(e => e.amount)) : 0;
     return { entries, maxAmount, lookup: map };
   }, [filteredTx]);
+
+  const weeklySpendingChartData = useMemo(() => {
+    if (selectedMonth === null) return [];
+    const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
+    const weeklySums = [0, 0, 0, 0, 0];
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dateKey = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const amount = dailySpending.lookup.get(dateKey) || 0;
+
+      if (day <= 7) {
+        weeklySums[0] += amount;
+      } else if (day <= 14) {
+        weeklySums[1] += amount;
+      } else if (day <= 21) {
+        weeklySums[2] += amount;
+      } else if (day <= 28) {
+        weeklySums[3] += amount;
+      } else {
+        weeklySums[4] += amount;
+      }
+    }
+
+    const numWeeks = daysInMonth > 28 ? 5 : 4;
+    const data = [];
+    for (let w = 0; w < numWeeks; w++) {
+      let dateRange = '';
+      if (w === 0) dateRange = '1-7';
+      else if (w === 1) dateRange = '8-14';
+      else if (w === 2) dateRange = '15-21';
+      else if (w === 3) dateRange = '22-28';
+      else if (w === 4) dateRange = daysInMonth === 29 ? '29' : `29-${daysInMonth}`;
+
+      data.push({
+        name: `Mng ${w + 1} (${dateRange})`,
+        'Pengeluaran': weeklySums[w],
+      });
+    }
+    return data;
+  }, [selectedMonth, selectedYear, dailySpending]);
+
+  const calendarDateTx = useMemo(() => {
+    if (!calendarDetailDate) return [];
+    return transactions.filter(t => format(new Date(t.date), 'yyyy-MM-dd') === calendarDetailDate);
+  }, [transactions, calendarDetailDate]);
+
+  const formattedCalendarDate = useMemo(() => {
+    if (!calendarDetailDate) return '';
+    try {
+      return format(new Date(calendarDetailDate), 'EEEE, d MMMM yyyy', { locale: id });
+    } catch {
+      return calendarDetailDate;
+    }
+  }, [calendarDetailDate]);
+
+  const calendarDateSpendingTotal = useMemo(() => {
+    return sumExpense(calendarDateTx);
+  }, [calendarDateTx]);
+
+  const calendarDateSpendingByPurpose = useMemo(() => {
+    const purposeMap = new Map<string, number>();
+    let adminFeeTotal = 0;
+    
+    calendarDateTx.forEach(t => {
+      if (t.type === 'expense' && t.purpose_id) {
+        const pur = purposes.find((p: any) => p.id === t.purpose_id);
+        const purName = pur?.name || 'Lainnya';
+        purposeMap.set(purName, (purposeMap.get(purName) || 0) + Number(t.amount));
+      } else if (t.type === 'bill') {
+        purposeMap.set('Tagihan', (purposeMap.get('Tagihan') || 0) + Number(t.amount));
+      } else if ((t.type === 'transfer' || t.type === 'saving') && t.admin_fee) {
+        adminFeeTotal += Number(t.admin_fee);
+      }
+    });
+
+    if (adminFeeTotal > 0) {
+      purposeMap.set(ADMIN_FEE_BUCKET, adminFeeTotal);
+    }
+
+    return Array.from(purposeMap.entries())
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+  }, [calendarDateTx, purposes]);
+
+  // Saran 1: Filter data transaksi terpisah khusus untuk Kalender Pengeluaran (heatmap)
+  const heatmapTx = useMemo(() => {
+    return transactions.filter(t => {
+      const d = new Date(t.date);
+      return d.getFullYear() === heatmapYear && d.getMonth() === heatmapMonth;
+    });
+  }, [transactions, heatmapYear, heatmapMonth]);
+
+  const heatmapDailySpending = useMemo(() => {
+    const map = new Map<string, number>();
+    heatmapTx.forEach(t => {
+      const key = format(new Date(t.date), 'yyyy-MM-dd');
+      map.set(key, (map.get(key) || 0) + expenseAmount(t));
+    });
+    const entries = Array.from(map.entries()).map(([date, amount]) => ({ date, amount }));
+    const maxAmount = entries.length > 0 ? Math.max(...entries.map(e => e.amount)) : 0;
+    return { entries, maxAmount, lookup: map };
+  }, [heatmapTx]);
 
   const heatmapData = useMemo(() => {
     const year = heatmapYear;
@@ -421,13 +451,13 @@ export default function Report() {
   const getHeatAmount = (day: number | null) => {
     if (day === null) return null;
     const key = `${String(heatmapData.year).padStart(4, '0')}-${String(heatmapData.month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    return dailySpending.lookup.get(key) ?? 0;
+    return heatmapDailySpending.lookup.get(key) ?? 0;
   };
 
   const heatTier = (amount: number | null): 0 | 1 | 2 | 3 | 4 | -1 => {
     if (amount === null) return -1;
     if (amount === 0) return 0;
-    const ratio = dailySpending.maxAmount > 0 ? amount / dailySpending.maxAmount : 0;
+    const ratio = heatmapDailySpending.maxAmount > 0 ? amount / heatmapDailySpending.maxAmount : 0;
     if (ratio < 0.25) return 1;
     if (ratio < 0.5) return 2;
     if (ratio < 0.75) return 3;
@@ -454,7 +484,7 @@ export default function Report() {
       if (day === null) return;
       if (isCurrentMonth && day > todayDay) return;
       const key = `${String(heatmapData.year).padStart(4, '0')}-${String(heatmapData.month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-      const amount = dailySpending.lookup.get(key) ?? 0;
+      const amount = heatmapDailySpending.lookup.get(key) ?? 0;
       allDays.push({ day, amount });
     });
     const total = allDays.reduce((sum, d) => sum + d.amount, 0);
@@ -477,7 +507,7 @@ export default function Report() {
     let zeroDays = 0, lowDays = 0, midDays = 0, highDays = 0;
     allDays.forEach(({ amount }) => {
       if (amount === 0) { zeroDays++; return; }
-      const ratio = dailySpending.maxAmount > 0 ? amount / dailySpending.maxAmount : 0;
+      const ratio = heatmapDailySpending.maxAmount > 0 ? amount / heatmapDailySpending.maxAmount : 0;
       if (ratio < 0.25) lowDays++;
       else if (ratio < 0.75) midDays++;
       else highDays++;
@@ -502,7 +532,6 @@ export default function Report() {
 
   const isCurrentHeatMonth = heatmapYear === new Date().getFullYear() && heatmapMonth === new Date().getMonth();
   const heatPeriodDays = isCurrentHeatMonth ? new Date().getDate() : heatmapData.daysInMonth;
-  const heatRemainingDays = isCurrentHeatMonth ? heatmapData.daysInMonth - new Date().getDate() : 0;
 
   const cashFlow = useMemo(() => {
     const totalIncome = summary.totalIncome;
@@ -929,22 +958,46 @@ export default function Report() {
   return (
     <div className="p-4 md:p-6 pb-24 md:pb-6 space-y-5 max-w-[1200px] mx-auto">
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div className="flex items-center justify-between gap-2 w-full md:flex-1">
-          <div className="flex items-center gap-2 min-w-0 shrink-0">
-            {selectedMonth !== null && (
-              <button
-                onClick={handleBackToYearly}
-                className="w-[46px] h-[46px] rounded-2xl bg-surface border border-line flex items-center justify-center hover:bg-surface-hover hover:border-accent/40 transition-all shrink-0"
-              >
-                <ArrowLeft className="w-4 h-4 text-text-primary" />
-              </button>
-            )}
-            <div className="relative" ref={monthPickerRef}>
+        {/* Sisi Kiri: Filter Kontrol */}
+        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+          {/* Segmented Control untuk Bulanan vs Tahunan */}
+          <div className="flex bg-surface p-1 rounded-2xl border border-line shrink-0 h-[46px] shadow-sm">
+            <button
+              onClick={() => {
+                if (selectedMonth === null) {
+                  setSelectedMonth(new Date().getMonth());
+                }
+              }}
+              className={clsx(
+                "px-4 rounded-xl text-[12px] md:text-[13px] font-bold transition-all",
+                selectedMonth !== null
+                  ? "bg-accent text-bg shadow-md shadow-accent/10 dark:shadow-accent/5"
+                  : "text-text-muted hover:text-text-primary hover:bg-surface-hover/50"
+              )}
+            >
+              Bulanan
+            </button>
+            <button
+              onClick={() => setSelectedMonth(null)}
+              className={clsx(
+                "px-4 rounded-xl text-[12px] md:text-[13px] font-bold transition-all",
+                selectedMonth === null
+                  ? "bg-accent text-bg shadow-md shadow-accent/10 dark:shadow-accent/5"
+                  : "text-text-muted hover:text-text-primary hover:bg-surface-hover/50"
+              )}
+            >
+              Tahunan
+            </button>
+          </div>
+
+          {/* Dropdown Bulan (Hanya muncul jika mode Bulanan / selectedMonth !== null) */}
+          {selectedMonth !== null && (
+            <div className="relative flex-1 md:flex-initial" ref={monthPickerRef}>
               <button
                 onClick={() => setIsMonthPickerOpen(!isMonthPickerOpen)}
-                className="bg-surface border border-line px-4 md:px-5 py-2.5 rounded-2xl flex items-center gap-2 md:gap-3 shadow-sm hover:border-accent/40 transition-all font-bold text-[12px] md:text-[13px] text-text-primary justify-between group h-[46px] min-w-[126px] md:min-w-[170px]"
+                className="bg-surface border border-line px-4 md:px-5 py-2.5 rounded-2xl flex items-center gap-2 md:gap-3 shadow-sm hover:border-accent/40 transition-all font-bold text-[12px] md:text-[13px] text-text-primary justify-between group h-[46px] w-full md:min-w-[170px]"
               >
-                <span>{selectedMonth !== null ? FULL_MONTH_NAMES[selectedMonth] : 'Pilih Bulan'}</span>
+                <span>{FULL_MONTH_NAMES[selectedMonth]}</span>
                 <ChevronDown className={clsx("w-4 h-4 text-text-muted transition-transform duration-300", isMonthPickerOpen && "rotate-180")} />
               </button>
 
@@ -962,8 +1015,8 @@ export default function Report() {
                             selectedMonth === idx
                               ? "bg-accent text-white font-bold"
                               : hasData
-                              ? "text-text-primary hover:bg-surface-hover hover:text-accent font-medium"
-                              : "text-text-muted/50 font-medium"
+                                ? "text-text-primary hover:bg-surface-hover hover:text-accent font-medium"
+                                : "text-text-muted/50 font-medium"
                           )}
                         >
                           {name}
@@ -975,736 +1028,686 @@ export default function Report() {
                 </div>
               )}
             </div>
-            <div className="relative" ref={yearPickerRef}>
-              <button
-                onClick={() => setIsYearPickerOpen(!isYearPickerOpen)}
-                className="bg-surface border border-line px-4 md:px-5 py-2.5 rounded-2xl flex items-center gap-2 md:gap-3 shadow-sm hover:border-accent/40 transition-all font-bold text-[12px] md:text-[13px] text-text-primary justify-between group h-[46px] min-w-[112px] md:min-w-[128px]"
-              >
-                <span>Tahun {selectedYear}</span>
-                <ChevronDown className={clsx("w-4 h-4 text-text-muted transition-transform duration-300", isYearPickerOpen && "rotate-180")} />
-              </button>
+          )}
 
-              {isYearPickerOpen && (
-                <div className="absolute top-full left-0 mt-2 z-30 w-[160px] bg-surface border border-line rounded-2xl shadow-2xl overflow-hidden animate-scale-in p-1">
-                  <div className="grid grid-cols-1 max-h-[200px] overflow-y-auto custom-scrollbar">
-                    {availableYears.map(y => (
-                      <button
-                        key={y}
-                        onClick={() => { setSelectedYear(y); setIsYearPickerOpen(false); setSelectedMonth(null); }}
-                        className={clsx(
-                          "w-full px-4 py-2.5 rounded-xl text-left text-[13px] transition-all flex items-center justify-between group",
-                          selectedYear === y
-                            ? "bg-accent text-white font-bold"
-                            : "text-text-primary hover:bg-surface-hover hover:text-accent font-medium"
-                        )}
-                      >
-                        {y}
-                        {selectedYear === y && <div className="w-1.5 h-1.5 rounded-full bg-white opacity-80" />}
-                      </button>
-                    ))}
-                  </div>
+          {/* Dropdown Tahun */}
+          <div className="relative flex-1 md:flex-initial" ref={yearPickerRef}>
+            <button
+              onClick={() => setIsYearPickerOpen(!isYearPickerOpen)}
+              className="bg-surface border border-line px-4 md:px-5 py-2.5 rounded-2xl flex items-center gap-2 md:gap-3 shadow-sm hover:border-accent/40 transition-all font-bold text-[12px] md:text-[13px] text-text-primary justify-between group h-[46px] w-full md:min-w-[128px]"
+            >
+              <span>Tahun {selectedYear}</span>
+              <ChevronDown className={clsx("w-4 h-4 text-text-muted transition-transform duration-300", isYearPickerOpen && "rotate-180")} />
+            </button>
+
+            {isYearPickerOpen && (
+              <div className="absolute top-full left-0 mt-2 z-30 w-[160px] bg-surface border border-line rounded-2xl shadow-2xl overflow-hidden animate-scale-in p-1">
+                <div className="grid grid-cols-1 max-h-[200px] overflow-y-auto custom-scrollbar">
+                  {availableYears.map(y => (
+                    <button
+                      key={y}
+                      onClick={() => { setSelectedYear(y); setIsYearPickerOpen(false); }}
+                      className={clsx(
+                        "w-full px-4 py-2.5 rounded-xl text-left text-[13px] transition-all flex items-center justify-between group",
+                        selectedYear === y
+                          ? "bg-accent text-white font-bold"
+                          : "text-text-primary hover:bg-surface-hover hover:text-accent font-medium"
+                      )}
+                    >
+                      {y}
+                      {selectedYear === y && <div className="w-1.5 h-1.5 rounded-full bg-white opacity-80" />}
+                    </button>
+                  ))}
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
-          <div className="flex items-center justify-end gap-2 min-w-0 shrink-0">
-            <button
-              onClick={exportToPDF}
-              className="bg-surface border border-line px-4 py-2.5 rounded-2xl flex items-center gap-2 shadow-sm hover:border-accent/40 transition-all font-bold text-[12px] md:text-[13px] text-text-primary h-[46px]"
-            >
-              <FileText className="w-4 h-4" /> PDF
-            </button>
-            <button
-              onClick={exportToExcel}
-              className="bg-surface border border-line px-4 py-2.5 rounded-2xl flex items-center gap-2 shadow-sm hover:border-accent/40 transition-all font-bold text-[12px] md:text-[13px] text-text-primary h-[46px]"
-            >
-              <Table className="w-4 h-4" /> Excel
-            </button>
-          </div>
+        </div>
+
+        {/* Sisi Kanan: Tombol Aksi Export */}
+        <div className="flex items-center gap-2 w-full md:w-auto md:justify-end animate-fade-in mt-2 md:mt-0">
+          <button
+            onClick={exportToPDF}
+            className="flex-1 md:flex-initial bg-surface border border-line px-4 py-2.5 rounded-2xl flex items-center justify-center gap-2 shadow-sm hover:border-accent/40 transition-all font-bold text-[12px] md:text-[13px] text-text-primary h-[46px]"
+          >
+            <FileText className="w-4 h-4" /> PDF
+          </button>
+          <button
+            onClick={exportToExcel}
+            className="flex-1 md:flex-initial bg-surface border border-line px-4 py-2.5 rounded-2xl flex items-center justify-center gap-2 shadow-sm hover:border-accent/40 transition-all font-bold text-[12px] md:text-[13px] text-text-primary h-[46px]"
+          >
+            <Table className="w-4 h-4" /> Excel
+          </button>
         </div>
       </div>
 
-      <div ref={reportRef}>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <div className="card p-4">
-            <p className="text-[10px] text-text-muted font-medium uppercase tracking-wider mb-1">Total Pemasukan</p>
-            <p className="text-[14px] md:text-[15px] font-bold text-success">{fmt(summary.totalIncome)}</p>
-            <div className="mt-1">
-              <ComparisonBadge change={monthOverMonth.incomeChange} label="Pemasukan" />
-            </div>
-          </div>
-          <div className="card p-4">
-            <p className="text-[10px] text-text-muted font-medium uppercase tracking-wider mb-1">Total Pengeluaran</p>
-            <p className="text-[14px] md:text-[15px] font-bold text-danger">{fmt(summary.totalExpense)}</p>
-            <div className="mt-1">
-              <ComparisonBadge change={monthOverMonth.expenseChange} label="Pengeluaran" />
-            </div>
-          </div>
-          <div className="card p-4">
-            <p className="text-[10px] text-text-muted font-medium uppercase tracking-wider mb-1">Total Tabungan</p>
-            <p className="text-[14px] md:text-[15px] font-bold text-accent">{fmt(summary.totalSaving)}</p>
-            <div className="mt-1">
-              <ComparisonBadge change={monthOverMonth.savingChange} label="Tabungan" />
-            </div>
-          </div>
-          <div className="card p-4">
-            <p className="text-[10px] text-text-muted font-medium uppercase tracking-wider mb-1">
-              {cashFlow.remaining >= 0 ? 'Sisa Dana' : 'Defisit'}
-            </p>
-            <p className={`text-[14px] md:text-[15px] font-bold ${cashFlow.remaining >= 0 ? 'text-success' : 'text-danger'}`}>
-              {cashFlow.remaining < 0 ? '-' : ''}{fmt(Math.abs(cashFlow.remaining))}
-            </p>
-            <div className="mt-1">
-              {cashFlow.remaining >= 0 ? (
-                <span className="text-[10px] font-medium text-success">
-                  Sisa {cashFlow.remainingPercent.toFixed(1)}% setelah pengeluaran & tabungan
-                </span>
-              ) : (
-                <span className="text-[10px] font-medium text-danger">
-                  Pengeluaran & tabungan melebihi pemasukan
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="card p-5 mt-4">
-          <div className="flex items-start justify-between gap-3 mb-4">
-            <div>
-              <h3 className="text-[13px] font-semibold text-text-primary">Insight Otomatis</h3>
-              <p className="text-[10px] text-text-muted mt-1">
-                Ringkasan cepat untuk membantu membaca kondisi keuangan pada periode terpilih.
-              </p>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {reportInsights.map((item) => {
-              const Icon = item.tone === 'up' ? TrendingUp : item.tone === 'down' ? TrendingDown : Minus;
-              const toneClass =
-                item.tone === 'up'
-                  ? 'text-success bg-success/10 border-success/15'
-                  : item.tone === 'down'
-                    ? 'text-danger bg-danger/10 border-danger/15'
-                    : 'text-text-muted bg-surface-alt/30 border-line';
-
-              return (
-                <div key={item.title} className="rounded-2xl border border-line bg-surface-alt/10 p-4">
-                  <div className="flex items-start gap-3">
-                    <div className={clsx('w-9 h-9 rounded-xl border flex items-center justify-center shrink-0', toneClass)}>
-                      <Icon className="w-4 h-4" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-[11px] font-semibold text-text-primary">{item.title}</p>
-                      <p className="text-[12px] text-text-secondary leading-relaxed mt-1">{item.text}</p>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="card p-5 mt-4">
-          <div className="flex items-start justify-between gap-3 mb-1">
-            <div>
-              <h3 className="text-[13px] font-semibold text-text-primary flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-accent" />
-                Kalender Pengeluaran
-              </h3>
-              <p className="text-[10px] text-text-muted mt-0.5">Intensitas pengeluaran harian • Total {heatMonthLabel}: <span className="font-semibold text-text-primary">{fmt(heatTotal)}</span></p>
-            </div>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => {
-                  if (heatmapMonth === 0) { setHeatmapMonth(11); setHeatmapYear(y => y - 1); }
-                  else setHeatmapMonth(m => m - 1);
-                }}
-                className="w-8 h-8 rounded-xl border border-line bg-surface flex items-center justify-center hover:bg-surface-hover transition-all"
-              >
-                <ChevronLeft className="w-3.5 h-3.5 text-text-muted" />
-              </button>
-              <button
-                onClick={() => {
-                  if (heatmapMonth === 11) { setHeatmapMonth(0); setHeatmapYear(y => y + 1); }
-                  else setHeatmapMonth(m => m + 1);
-                }}
-                className="w-8 h-8 rounded-xl border border-line bg-surface flex items-center justify-center hover:bg-surface-hover transition-all"
-              >
-                <ChevronRight className="w-3.5 h-3.5 text-text-muted" />
-              </button>
-            </div>
+      <div ref={reportRef} className="space-y-6">
+        {/* SECTION 1: RINGKASAN FINANSIAL UTAMA (Financial Overview Card) */}
+        <div className="card p-5 md:p-6 space-y-6 animate-scale-in">
+          <div>
+            <h3 className="text-[13px] font-bold text-text-primary uppercase tracking-wider">Ringkasan Finansial Utama</h3>
+            <p className="text-[10px] text-text-muted mt-0.5">Ikhtisar total transaksi, progres alur kas, dan rata-rata performa saldo Anda.</p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-5 md:gap-6 mt-2">
-            <div className="min-w-0">
-              <div className="grid grid-cols-7 text-center mb-1.5">
-                {['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'].map(d => (
-                  <span key={d} className="text-[10px] text-text-muted font-medium py-0.5">{d}</span>
-                ))}
-              </div>
-              <div className="space-y-1 md:space-y-1.5">
-                {heatmapData.weeks.map((week, wi) => (
-                  <div key={wi} className="grid grid-cols-7 gap-1 md:gap-1.5">
-                    {week.map((day, di) => {
-                      const amount = getHeatAmount(day);
-                      const tier = heatTier(amount);
-                      if (day === null) return <div key={di} className="aspect-square" />;
-                      const today = new Date();
-                      const isToday = heatmapYear === today.getFullYear() && heatmapMonth === today.getMonth() && day === today.getDate();
-                      const isFuture = heatmapYear === today.getFullYear() && heatmapMonth === today.getMonth() && day > today.getDate();
-                      return (
-                        <div
-                          key={di}
-                          title={isFuture ? `${day} ${heatMonthLabel} — belum terjadi` : `${day} ${heatMonthLabel}: ${fmt(amount ?? 0)}`}
-                          style={isFuture ? { background: 'var(--color-surface-alt)', color: 'var(--color-text-muted)', opacity: 0.4 } : heatStyle(tier)}
-                          className={clsx(
-                            'aspect-square rounded-lg flex items-center justify-center text-[11px] md:text-[12px] font-semibold transition-all cursor-default',
-                            !isFuture && 'hover:scale-110 hover:shadow-md',
-                            tier === 0 && 'border border-line',
-                            isToday && 'ring-2 ring-accent ring-offset-1 dark:ring-offset-surface',
-                            isFuture && 'border border-dashed border-line'
-                          )}
-                        >
-                          {day}
-                        </div>
-                      );
-                    })}
-                  </div>
-                ))}
-              </div>
-
-              <div className="flex items-center flex-wrap gap-x-3 gap-y-1.5 mt-4 pt-3 border-t border-line">
-                <span className="text-[9px] text-text-muted font-medium uppercase tracking-wider mr-1">Skala</span>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-3 h-3 rounded-[4px] border border-line" style={{ background: 'var(--heat-0-bg)' }} />
-                  <span className="text-[10px] text-text-muted">0</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-3 h-3 rounded-[4px]" style={{ background: 'var(--heat-1-bg)' }} />
-                  <span className="text-[10px] text-text-muted">Rendah</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-3 h-3 rounded-[4px]" style={{ background: 'var(--heat-2-bg)' }} />
-                  <span className="text-[10px] text-text-muted">Cukup</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-3 h-3 rounded-[4px]" style={{ background: 'var(--heat-3-bg)' }} />
-                  <span className="text-[10px] text-text-muted">Sedang</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-3 h-3 rounded-[4px]" style={{ background: 'var(--heat-4-bg)' }} />
-                  <span className="text-[10px] text-text-muted">Tinggi</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-3 min-w-0">
-              <div className="grid grid-cols-2 gap-2.5">
-                <div className="rounded-xl bg-gradient-to-br from-accent/10 to-accent/5 border border-accent/20 px-3 py-2.5">
-                  <p className="text-[9px] text-text-muted font-medium uppercase tracking-wider">Total Bulan Ini</p>
-                  <p className="text-[14px] md:text-[15px] font-bold text-text-primary mt-0.5 truncate">{fmt(heatStats.total)}</p>
-                </div>
-                <div className="rounded-xl bg-surface-alt/40 border border-line px-3 py-2.5">
-                  <p className="text-[9px] text-text-muted font-medium uppercase tracking-wider">Rata-rata / Hari Aktif</p>
-                  <p className="text-[14px] md:text-[15px] font-bold text-text-primary mt-0.5 truncate">{fmt(heatStats.avgPerDay)}</p>
-                  <p className="text-[9px] text-text-muted mt-0.5">{heatStats.activeDaysCount} hari berdata</p>
-                </div>
-                <div className="rounded-xl bg-surface-alt/40 border border-line px-3 py-2.5">
-                  <p className="text-[9px] text-text-muted font-medium uppercase tracking-wider">Pengeluaran Puncak</p>
-                  <p className="text-[13px] md:text-[14px] font-bold text-danger mt-0.5 truncate">
-                    {heatStats.peakDay.amount > 0 ? fmt(heatStats.peakDay.amount) : '-'}
-                  </p>
-                  <p className="text-[9px] text-text-muted mt-0.5">
-                    {heatStats.peakDay.amount > 0 ? `tanggal ${heatStats.peakDay.day}` : 'belum ada data'}
-                  </p>
-                </div>
-                <div className="rounded-xl bg-surface-alt/40 border border-line px-3 py-2.5">
-                  <p className="text-[9px] text-text-muted font-medium uppercase tracking-wider">Hari Aktif</p>
-                  <p className="text-[14px] md:text-[15px] font-bold text-text-primary mt-0.5">
-                    {heatStats.activeDaysCount}<span className="text-[11px] font-medium text-text-muted">/{heatPeriodDays}</span>
-                  </p>
-                  <p className="text-[9px] text-text-muted mt-0.5">
-                    {heatStats.zeroDays} hari tanpa pengeluaran
-                    {heatRemainingDays > 0 && <span className="ml-0.5">• {heatRemainingDays} hari tersisa</span>}
-                  </p>
-                </div>
-              </div>
-
-              <div className="rounded-xl border border-line bg-surface-alt/20 px-3 py-2.5">
-                <p className="text-[10px] text-text-muted font-medium uppercase tracking-wider mb-2">Distribusi Intensitas</p>
-                <div className="flex h-2 rounded-full overflow-hidden bg-surface-alt/40">
-                  {heatStats.totalDays > 0 && (
-                    <>
-                      <div style={{ width: `${(heatStats.zeroDays / heatStats.totalDays) * 100}%`, background: 'var(--heat-0-bg)' }} />
-                      <div style={{ width: `${(heatStats.lowDays / heatStats.totalDays) * 100}%`, background: 'var(--heat-1-bg)' }} />
-                      <div style={{ width: `${(heatStats.midDays / heatStats.totalDays) * 100}%`, background: 'var(--heat-3-bg)' }} />
-                      <div style={{ width: `${(heatStats.highDays / heatStats.totalDays) * 100}%`, background: 'var(--heat-4-bg)' }} />
-                    </>
-                  )}
-                </div>
-                <div className="grid grid-cols-4 gap-1 mt-2 text-center">
-                  <div>
-                    <p className="text-[10px] font-bold text-text-primary">{heatStats.zeroDays}</p>
-                    <p className="text-[9px] text-text-muted">Nol</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold" style={{ color: 'var(--heat-2-bg)' }}>{heatStats.lowDays}</p>
-                    <p className="text-[9px] text-text-muted">Rendah</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold" style={{ color: 'var(--heat-3-bg)' }}>{heatStats.midDays}</p>
-                    <p className="text-[9px] text-text-muted">Sedang</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold" style={{ color: 'var(--heat-4-bg)' }}>{heatStats.highDays}</p>
-                    <p className="text-[9px] text-text-muted">Tinggi</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-xl border border-line bg-surface-alt/20 px-3 py-2.5">
-                <p className="text-[10px] text-text-muted font-medium uppercase tracking-wider mb-2">Hari Kerja vs Akhir Pekan</p>
-                <div className="space-y-2">
-                  <div>
-                    <div className="flex justify-between text-[11px] mb-1">
-                      <span className="text-text-secondary">Hari Kerja</span>
-                      <span className="font-semibold text-text-primary">{fmt(heatStats.avgWeekday)}<span className="text-[9px] text-text-muted font-normal"> /hari</span></span>
-                    </div>
-                    <div className="h-1.5 bg-surface-alt/50 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-accent rounded-full transition-all"
-                        style={{ width: `${Math.max(heatStats.avgWeekday, heatStats.avgWeekend) > 0 ? (heatStats.avgWeekday / Math.max(heatStats.avgWeekday, heatStats.avgWeekend)) * 100 : 0}%` }}
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <div className="flex justify-between text-[11px] mb-1">
-                      <span className="text-text-secondary">Akhir Pekan</span>
-                      <span className="font-semibold text-text-primary">{fmt(heatStats.avgWeekend)}<span className="text-[9px] text-text-muted font-normal"> /hari</span></span>
-                    </div>
-                    <div className="h-1.5 bg-surface-alt/50 rounded-full overflow-hidden">
-                      <div
-                        className="h-full rounded-full transition-all"
-                        style={{
-                          width: `${Math.max(heatStats.avgWeekday, heatStats.avgWeekend) > 0 ? (heatStats.avgWeekend / Math.max(heatStats.avgWeekday, heatStats.avgWeekend)) * 100 : 0}%`,
-                          background: 'var(--chart-2)',
-                        }}
-                      />
-                    </div>
-                  </div>
-                </div>
-                {heatStats.avgWeekend > heatStats.avgWeekday && heatStats.avgWeekday > 0 && (
-                  <p className="text-[10px] text-text-muted mt-2 leading-snug">
-                    Anda cenderung lebih boros di akhir pekan, rata-rata {((heatStats.avgWeekend / heatStats.avgWeekday - 1) * 100).toFixed(0)}% lebih tinggi.
-                  </p>
-                )}
-                {heatStats.avgWeekday > heatStats.avgWeekend && heatStats.avgWeekend > 0 && (
-                  <p className="text-[10px] text-text-muted mt-2 leading-snug">
-                    Pengeluaran lebih banyak terjadi pada hari kerja.
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
-          <div className="card p-3">
-            <p className="text-[10px] text-text-muted font-medium">Rata-rata Masuk/Bulan</p>
-            <p className="text-[12px] font-bold text-success">{fmt(summary.avgMonthlyIncome)}</p>
-            {selectedMonth === null && <p className="text-[9px] text-text-muted">dari {summary.divisor} bulan berdata</p>}
-          </div>
-          <div className="card p-3">
-            <p className="text-[10px] text-text-muted font-medium">Rata-rata Pengeluaran per Bulan</p>
-            <p className="text-[12px] font-bold text-danger">{fmt(summary.avgMonthlyExpense)}</p>
-            {selectedMonth === null && <p className="text-[9px] text-text-muted">dari {summary.divisor} bulan berdata</p>}
-          </div>
-          <div className="card p-3">
-            <p className="text-[10px] text-text-muted font-medium">{selectedMonth !== null ? 'Rata-rata Pengeluaran per Bulan' : 'Total Pengeluaran per Tahun'}</p>
-            <p className="text-[12px] font-bold text-danger">{fmt(selectedMonth !== null ? yearAverageExpense : summary.totalExpense)}</p>
-            {selectedMonth !== null && <p className="text-[9px] text-text-muted">rata-rata tahun {selectedYear}</p>}
-          </div>
-          <div className="card p-3">
-            <p className="text-[10px] text-text-muted font-medium">
-              {selectedMonth !== null ? 'Rata-rata Pengeluaran per Hari' : 'Bulan Pengeluaran Tertinggi'}
-            </p>
-            <p className="text-[12px] font-bold text-danger">
-              {selectedMonth !== null ? fmt(averageDailyExpense) : (summary.worstMonth?.name || '-')}
-            </p>
-            {selectedMonth !== null && (
-              <p className="text-[9px] text-text-muted">
-                dibagi {selectedYear === new Date().getFullYear() && selectedMonth === new Date().getMonth()
-                  ? `${new Date().getDate()} hari berjalan`
-                  : `total ${new Date(selectedYear, selectedMonth + 1, 0).getDate()} hari`}
-              </p>
-            )}
-          </div>
-        </div>
-
-        {selectedMonth === null && (
-          <div className="card p-4 mt-4 bg-surface-alt/30 border-border/50">
-            <p className="text-[10px] text-text-muted font-medium mb-2">vs {monthOverMonth.prevPeriodLabel}</p>
-            <div className="flex flex-wrap gap-4">
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] text-text-muted">Pemasukan:</span>
+          {/* 4 Kolom KPI Utama (Tanpa Border Individual, Bersih & Elegan) */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 py-4 px-2 bg-surface-alt/10 rounded-2xl border border-line/50">
+            <div className="text-center md:text-left md:border-r border-line last:border-0 md:px-4 min-w-0">
+              <p className="text-[10px] text-text-muted font-semibold uppercase tracking-wider mb-1">Total Pemasukan</p>
+              <p className="text-[15px] md:text-[17px] font-bold text-success truncate">{fmt(summary.totalIncome)}</p>
+              <div className="mt-1 flex items-center justify-center md:justify-start">
                 <ComparisonBadge change={monthOverMonth.incomeChange} label="Pemasukan" />
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] text-text-muted">Pengeluaran:</span>
+            </div>
+            <div className="text-center md:text-left md:border-r border-line last:border-0 md:px-4 min-w-0">
+              <p className="text-[10px] text-text-muted font-semibold uppercase tracking-wider mb-1">Total Pengeluaran</p>
+              <p className="text-[15px] md:text-[17px] font-bold text-danger truncate">{fmt(summary.totalExpense)}</p>
+              <div className="mt-1 flex items-center justify-center md:justify-start">
                 <ComparisonBadge change={monthOverMonth.expenseChange} label="Pengeluaran" />
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] text-text-muted">Tabungan:</span>
+            </div>
+            <div className="text-center md:text-left md:border-r border-line last:border-0 md:px-4 min-w-0">
+              <p className="text-[10px] text-text-muted font-semibold uppercase tracking-wider mb-1">Total Tabungan</p>
+              <p className="text-[15px] md:text-[17px] font-bold text-accent truncate">{fmt(summary.totalSaving)}</p>
+              <div className="mt-1 flex items-center justify-center md:justify-start">
                 <ComparisonBadge change={monthOverMonth.savingChange} label="Tabungan" />
               </div>
             </div>
+            <div className="text-center md:text-left md:px-4 min-w-0">
+              <p className="text-[10px] text-text-muted font-semibold uppercase tracking-wider mb-1">
+                {cashFlow.remaining >= 0 ? 'Sisa Dana' : 'Defisit'}
+              </p>
+              <p className={`text-[15px] md:text-[17px] font-bold truncate ${cashFlow.remaining >= 0 ? 'text-success' : 'text-danger'}`}>
+                {cashFlow.remaining < 0 ? '-' : ''}{fmt(Math.abs(cashFlow.remaining))}
+              </p>
+              <div className="mt-1 flex items-center justify-center md:justify-start">
+                {cashFlow.remaining >= 0 ? (
+                  <span className="text-[10px] font-medium text-success whitespace-nowrap">
+                    Sisa {cashFlow.remainingPercent.toFixed(0)}% pemasukan
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-medium text-danger whitespace-nowrap">
+                    Pengeluaran defisit
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
-        )}
 
-        {cashFlow.totalIncome > 0 && (
-          <div className="card p-5 mt-4">
-            <h3 className="text-[13px] font-semibold text-text-primary mb-4">Alur Uang</h3>
-            <p className="text-[10px] text-text-muted mb-4">Ringkasan arus kas pada periode terpilih. Tidak termasuk saldo awal akun.</p>
+          {/* Rata-Rata Bulanan & Perbandingan Tahun/Hari */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2">
+            <div className="p-3 bg-surface-alt/20 rounded-xl border border-line/40 min-w-0">
+              <p className="text-[10px] text-text-muted font-medium">Rata-rata Masuk/Bulan</p>
+              <p className="text-[13px] font-bold text-success mt-0.5 truncate">{fmt(summary.avgMonthlyIncome)}</p>
+              {selectedMonth === null && <p className="text-[9px] text-text-muted mt-0.5">dari {summary.divisor} bulan</p>}
+            </div>
+            <div className="p-3 bg-surface-alt/20 rounded-xl border border-line/40 min-w-0">
+              <p className="text-[10px] text-text-muted font-medium">Rata-rata Keluar/Bulan</p>
+              <p className="text-[13px] font-bold text-danger mt-0.5 truncate">{fmt(summary.avgMonthlyExpense)}</p>
+              {selectedMonth === null && <p className="text-[9px] text-text-muted mt-0.5">dari {summary.divisor} bulan</p>}
+            </div>
+            <div className="p-3 bg-surface-alt/20 rounded-xl border border-line/40 min-w-0">
+              <p className="text-[10px] text-text-muted font-medium">
+                {selectedMonth !== null ? 'Rata-rata Keluar/Tahun' : 'Total Keluar/Tahun'}
+              </p>
+              <p className="text-[13px] font-bold text-danger mt-0.5 truncate">
+                {fmt(selectedMonth !== null ? yearAverageExpense : summary.totalExpense)}
+              </p>
+              {selectedMonth !== null && <p className="text-[9px] text-text-muted mt-0.5">tahun {selectedYear}</p>}
+            </div>
+            <div className="p-3 bg-surface-alt/20 rounded-xl border border-line/40 min-w-0">
+              <p className="text-[10px] text-text-muted font-medium">
+                {selectedMonth !== null ? 'Rata-rata Keluar/Hari' : 'Puncak Keluar (Bulan)'}
+              </p>
+              <p className="text-[13px] font-bold text-danger mt-0.5 truncate">
+                {selectedMonth !== null ? fmt(averageDailyExpense) : (summary.worstMonth?.name || '-')}
+              </p>
+              {selectedMonth !== null && (
+                <p className="text-[9px] text-text-muted mt-0.5">
+                  {selectedYear === new Date().getFullYear() && selectedMonth === new Date().getMonth()
+                    ? `${new Date().getDate()} hari berjalan`
+                    : `${new Date(selectedYear, selectedMonth + 1, 0).getDate()} hari penuh`}
+                </p>
+              )}
+            </div>
+          </div>
 
-            <div className="space-y-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-success/10 flex items-center justify-center shrink-0">
-                  <svg className="w-5 h-5 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
+          {/* Perbandingan Periode Sebelumnya (Khusus Tahunan) */}
+          {selectedMonth === null && (
+            <div className="p-3 bg-surface-alt/30 border border-line/50 rounded-xl flex flex-col md:flex-row md:items-center justify-between text-[11px] gap-2">
+              <span className="text-text-muted font-semibold">Perbandingan vs Tahun {monthOverMonth.prevPeriodLabel}:</span>
+              <div className="flex gap-4">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-text-secondary">Pemasukan:</span>
+                  <ComparisonBadge change={monthOverMonth.incomeChange} label="Pemasukan" />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-[12px] font-medium text-text-primary">Total Pemasukan</span>
-                    <span className="text-[13px] font-bold text-success">{fmt(cashFlow.totalIncome)}</span>
-                  </div>
-                  <div className="h-3 bg-surface-alt rounded-full overflow-hidden">
-                    <div className="h-full bg-success rounded-full" style={{ width: '100%' }} />
-                  </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-text-secondary">Pengeluaran:</span>
+                  <ComparisonBadge change={monthOverMonth.expenseChange} label="Pengeluaran" />
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-text-secondary">Tabungan:</span>
+                  <ComparisonBadge change={monthOverMonth.savingChange} label="Tabungan" />
                 </div>
               </div>
+            </div>
+          )}
 
-              <div className="ml-5 border-l-2 border-line pl-4 space-y-3">
+          {/* Alur Uang (Cash Flow Progress) */}
+          {cashFlow.totalIncome > 0 && (
+            <div className="pt-5 border-t border-line space-y-4">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-1">
+                <h4 className="text-[12px] font-bold text-text-primary uppercase tracking-wider">Alur & Progres Arus Kas</h4>
+                <span className="text-[9px] font-semibold text-text-muted bg-surface-alt/60 px-2 py-0.5 rounded-full w-fit">
+                  Formula: Pemasukan - Pengeluaran - Tabungan = Sisa
+                </span>
+              </div>
+
+              <div className="space-y-4">
+                {/* Total Pemasukan */}
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-danger/10 flex items-center justify-center shrink-0">
-                    <span className="text-[11px] font-bold text-danger">1</span>
+                  <div className="w-9 h-9 rounded-xl bg-success/10 flex items-center justify-center shrink-0">
+                    <TrendingUp className="w-4 h-4 text-success" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-[11px] font-medium text-text-primary">Pengeluaran{cashFlow.totalBill > 0 ? ' & Tagihan' : ''}</span>
-                      <span className="text-[12px] font-bold text-danger">{fmt(cashFlow.totalExpense)} <span className="text-[10px] font-normal text-text-muted">({cashFlow.expensePercent.toFixed(1)}%)</span></span>
+                      <span className="text-[11px] font-semibold text-text-primary">Total Pemasukan</span>
+                      <span className="text-[12px] font-bold text-success">{fmt(cashFlow.totalIncome)}</span>
                     </div>
-                    <div className="h-2 bg-surface-alt rounded-full overflow-hidden">
-                      <div className="h-full bg-danger rounded-full transition-all duration-500" style={{ width: `${Math.min(cashFlow.expensePercent, 100)}%` }} />
+                    <div className="h-2.5 bg-surface-alt rounded-full overflow-hidden">
+                      <div className="h-full bg-success rounded-full" style={{ width: '100%' }} />
                     </div>
                   </div>
                 </div>
 
-                {cashFlow.totalSaving > 0 && (
+                {/* Sub-aliran */}
+                <div className="ml-4 border-l border-line pl-4 space-y-3.5">
+                  {/* Pengeluaran */}
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center shrink-0">
-                      <span className="text-[11px] font-bold text-accent">2</span>
+                    <div className="w-7 h-7 rounded-lg bg-danger/10 flex items-center justify-center shrink-0">
+                      <TrendingDown className="w-3.5 h-3.5 text-danger" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-[11px] font-medium text-text-primary">Tabungan</span>
-                        <span className="text-[12px] font-bold text-accent">{fmt(cashFlow.totalSaving)} <span className="text-[10px] font-normal text-text-muted">({cashFlow.savingPercent.toFixed(1)}%)</span></span>
-                      </div>
-                      <div className="h-2 bg-surface-alt rounded-full overflow-hidden">
-                        <div className="h-full bg-accent rounded-full transition-all duration-500" style={{ width: `${Math.min(cashFlow.savingPercent, 100)}%` }} />
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex items-center gap-3">
-                  <div className={clsx(
-                    "w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
-                    cashFlow.remaining >= 0 ? "bg-success/10" : "bg-danger/10"
-                  )}>
-                    <span className={clsx(
-                      "text-[11px] font-bold",
-                      cashFlow.remaining >= 0 ? "text-success" : "text-danger"
-                    )}>
-                      {cashFlow.remaining >= 0 ? '3' : '!'}
-                    </span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[11px] font-medium text-text-primary">
-                        {cashFlow.remaining >= 0 ? 'Hasil Bersih Periode' : 'Defisit Periode'}
-                      </span>
-                      <span className={clsx(
-                        "text-[12px] font-bold",
-                        cashFlow.remaining >= 0 ? "text-success" : "text-danger"
-                      )}>
-                        {cashFlow.remaining < 0 ? '-' : ''}{fmt(Math.abs(cashFlow.remaining))}
-                        <span className="text-[10px] font-normal text-text-muted">
-                          {' '}({cashFlow.netFlowPercent.toFixed(1)}%)
+                        <span className="text-[11px] font-medium text-text-primary">Pengeluaran & Tagihan</span>
+                        <span className="text-[11px] font-bold text-danger">
+                          {fmt(cashFlow.totalExpense)}{' '}
+                          <span className="text-[9px] font-normal text-text-muted">({cashFlow.expensePercent.toFixed(0)}%)</span>
                         </span>
-                      </span>
-                    </div>
-                    <div className="h-2 bg-surface-alt rounded-full overflow-hidden">
-                      <div
-                        className={clsx(
-                          "h-full rounded-full transition-all duration-500",
-                          cashFlow.remaining >= 0 ? "bg-success/60" : "bg-danger/70"
-                        )}
-                        style={{ width: `${Math.min(cashFlow.netFlowPercent, 100)}%` }}
-                      />
-                    </div>
-                    <p className={clsx(
-                      "mt-1 text-[10px] font-medium",
-                      cashFlow.remaining >= 0 ? "text-success" : "text-danger"
-                    )}>
-                      {cashFlow.remaining >= 0
-                        ? 'Dana periode ini masih tersisa setelah pengeluaran dan tabungan.'
-                        : 'Pengeluaran dan tabungan periode ini melebihi total pemasukan.'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-2 pt-3 border-t border-line">
-                <div className="rounded-2xl border border-line bg-surface-alt/20 p-3.5 space-y-3">
-                  <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
-                    <span className="text-[11px] font-semibold text-text-primary">Rumus periode</span>
-                    <span className="text-[10px] text-text-muted">Pemasukan - Pengeluaran - Tabungan = hasil bersih</span>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr_auto_1fr_auto_1.1fr] gap-2 items-center">
-                    <div className="rounded-xl bg-surface border border-line px-3 py-2">
-                      <p className="text-[10px] text-text-muted font-medium">Pemasukan</p>
-                      <p className="text-[12px] font-bold text-text-primary">{fmt(cashFlow.totalIncome)}</p>
-                    </div>
-                    <div className="hidden md:flex items-center justify-center text-text-muted font-bold">-</div>
-
-                    <div className="rounded-xl bg-surface border border-line px-3 py-2">
-                      <p className="text-[10px] text-text-muted font-medium">Pengeluaran</p>
-                      <p className="text-[12px] font-bold text-text-primary">{fmt(cashFlow.totalExpense)}</p>
-                    </div>
-                    <div className="hidden md:flex items-center justify-center text-text-muted font-bold">-</div>
-
-                    <div className="rounded-xl bg-surface border border-line px-3 py-2">
-                      <p className="text-[10px] text-text-muted font-medium">Tabungan</p>
-                      <p className="text-[12px] font-bold text-text-primary">{fmt(cashFlow.totalSaving)}</p>
-                    </div>
-                    <div className="hidden md:flex items-center justify-center text-text-muted font-bold">=</div>
-
-                    <div className={clsx(
-                      'rounded-xl px-3 py-2 border',
-                      cashFlow.remaining >= 0
-                        ? 'bg-success/10 border-success/20'
-                        : 'bg-danger/10 border-danger/20'
-                    )}>
-                      <p className={clsx(
-                        'text-[10px] font-medium',
-                        cashFlow.remaining >= 0 ? 'text-success' : 'text-danger'
-                      )}>
-                        {cashFlow.remaining >= 0 ? 'Sisa Dana' : 'Defisit'}
-                      </p>
-                      <p className={clsx(
-                        'text-[12px] font-bold',
-                        cashFlow.remaining >= 0 ? 'text-success' : 'text-danger'
-                      )}>
-                        {cashFlow.remaining < 0 ? '-' : ''}{fmt(Math.abs(cashFlow.remaining))}
-                      </p>
+                      </div>
+                      <div className="h-1.5 bg-surface-alt rounded-full overflow-hidden">
+                        <div className="h-full bg-danger rounded-full" style={{ width: `${Math.min(cashFlow.expensePercent, 100)}%` }} />
+                      </div>
                     </div>
                   </div>
 
-                  <div className="md:hidden text-[11px] font-semibold text-text-primary">
-                    {fmt(cashFlow.totalIncome)} - {fmt(cashFlow.totalExpense)} - {fmt(cashFlow.totalSaving)} ={' '}
-                    <span className={cashFlow.remaining >= 0 ? 'text-success' : 'text-danger'}>
-                      {cashFlow.remaining < 0 ? '-' : ''}{fmt(Math.abs(cashFlow.remaining))}
-                    </span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-4 mt-3">
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-2.5 h-2.5 rounded-full bg-danger" />
-                    <span className="text-[10px] text-text-muted">Pengeluaran</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-2.5 h-2.5 rounded-full bg-accent" />
-                    <span className="text-[10px] text-text-muted">Tabungan</span>
-                  </div>
-                  {cashFlow.remaining >= 0 ? (
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-2.5 h-2.5 rounded-full bg-success/60" />
-                      <span className="text-[10px] text-text-muted">Sisa</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-2.5 h-2.5 rounded-full bg-danger/70" />
-                      <span className="text-[10px] text-text-muted">Defisit</span>
+                  {/* Tabungan */}
+                  {cashFlow.totalSaving > 0 && (
+                    <div className="flex items-center gap-3">
+                      <div className="w-7 h-7 rounded-lg bg-accent/10 flex items-center justify-center shrink-0">
+                        <TrendingUp className="w-3.5 h-3.5 text-accent" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[11px] font-medium text-text-primary">Tabungan disisihkan</span>
+                          <span className="text-[11px] font-bold text-accent">
+                            {fmt(cashFlow.totalSaving)}{' '}
+                            <span className="text-[9px] font-normal text-text-muted">({cashFlow.savingPercent.toFixed(0)}%)</span>
+                          </span>
+                        </div>
+                        <div className="h-1.5 bg-surface-alt rounded-full overflow-hidden">
+                          <div className="h-full bg-accent rounded-full" style={{ width: `${Math.min(cashFlow.savingPercent, 100)}%` }} />
+                        </div>
+                      </div>
                     </div>
                   )}
+
+                  {/* Hasil Bersih */}
+                  <div className="flex items-center gap-3">
+                    <div className={clsx(
+                      "w-7 h-7 rounded-lg flex items-center justify-center shrink-0",
+                      cashFlow.remaining >= 0 ? "bg-success/10 text-success" : "bg-danger/10 text-danger"
+                    )}>
+                      {cashFlow.remaining >= 0 ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[11px] font-medium text-text-primary">
+                          {cashFlow.remaining >= 0 ? 'Sisa Bersih Arus Kas' : 'Defisit Arus Uang'}
+                        </span>
+                        <span className={clsx(
+                          "text-[11px] font-bold",
+                          cashFlow.remaining >= 0 ? "text-success" : "text-danger"
+                        )}>
+                          {cashFlow.remaining < 0 ? '-' : ''}{fmt(Math.abs(cashFlow.remaining))}
+                          <span className="text-[9px] font-normal text-text-muted"> ({cashFlow.netFlowPercent.toFixed(0)}%)</span>
+                        </span>
+                      </div>
+                      <div className="h-1.5 bg-surface-alt rounded-full overflow-hidden">
+                        <div
+                          className={clsx(
+                            "h-full rounded-full",
+                            cashFlow.remaining >= 0 ? "bg-success/60" : "bg-danger/70"
+                          )}
+                          style={{ width: `${Math.min(cashFlow.netFlowPercent, 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* SECTION 2: ASISTEN FINANSIAL PINTAR (Smart Financial Coach Card) */}
+        {(() => {
+          const isSurplus = cashFlow.remaining >= 0;
+          const netRemaining = cashFlow.remaining;
+          const topCategory = expenseByCategory[0];
+          const topPurpose = expenseByPurpose[0];
+
+          return (
+            <div className="card p-5 bg-gradient-to-br from-accent/5 to-accent/10 border border-accent/20 shadow-sm space-y-4 animate-scale-in">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-accent/20 flex items-center justify-center shrink-0">
+                  <span className="text-[20px] animate-pulse">🧠</span>
+                </div>
+                <div>
+                  <h3 className="text-[13px] font-bold text-text-primary">Analisis Keuangan</h3>
+                </div>
+                <div className="ml-auto shrink-0">
+                  <span className={clsx(
+                    "px-3 py-1 rounded-full text-[9px] font-bold uppercase tracking-wider border",
+                    isSurplus ? "bg-success/15 text-success border-success/30" : "bg-danger/15 text-danger border-danger/30"
+                  )}>
+                    {isSurplus ? '🟢 SURPLUS' : '🔴 DEFISIT'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="text-[12px] text-text-secondary leading-relaxed space-y-3 bg-surface/50 p-4 rounded-xl border border-line">
+                <p>
+                  Halo! Berdasarkan kalkulasi data, keuangan Anda periode ini berada dalam kondisi {' '}
+                  <span className={clsx("font-bold", isSurplus ? "text-success" : "text-danger")}>
+                    {isSurplus ? 'Surplus' : 'Defisit'}
+                  </span>
+                  . Total pendapatan tercatat sebesar <span className="font-semibold text-success">{fmt(summary.totalIncome)}</span>, sedangkan pengeluaran dan tabungan Anda masing-masing menyentuh <span className="font-semibold text-danger">{fmt(summary.totalExpense)}</span> dan <span className="font-semibold text-accent">{fmt(summary.totalSaving)}</span>.
+                </p>
+
+                {isSurplus ? (
+                  <p>
+                    📈 **Keuangan Anda sehat!** Anda memiliki sisa saldo aman sebesar <span className="font-semibold text-success">{fmt(netRemaining)}</span> setelah pengeluaran dan tabungan. Rasio tabungan Anda periode ini menyentuh <span className="font-bold text-accent">{savingsRate.toFixed(1)}%</span>, angka surplus yang sangat baik untuk menjaga ketahanan dana darurat Anda!
+                  </p>
+                ) : (
+                  <p>
+                    ⚠️ **Perhatian Khusus!** Dompet Anda mengalami defisit arus kas sebesar <span className="font-semibold text-danger">{fmt(Math.abs(netRemaining))}</span> karena total pengeluaran dan tabungan melampaui pendapatan. Disarankan untuk membatasi konsumsi barang sekunder dan menata kembali rencana keuangan bulan depan.
+                  </p>
+                )}
+
+                {topCategory && (
+                  <p>
+                    🍔 Pemicu pengeluaran terbesar bersumber dari kategori <span className="font-semibold text-text-primary">{topCategory.name}</span> sebesar <span className="font-semibold text-danger">{fmt(topCategory.value)}</span> ({((topCategory.value / summary.totalExpense) * 100).toFixed(0)}% dari total pengeluaran). {topCategory.name === 'Makanan' ? 'Mengurangi frekuensi makan di luar di akhir pekan dapat menghemat pengeluaran bulanan Anda secara signifikan.' : 'Cobalah untuk menaruh plafon budget maksimum bulanan khusus untuk kategori tersebut.'}
+                  </p>
+                )}
+
+                {topPurpose && (
+                  <p>
+                    🎯 Secara tujuan, alokasi dana terbesar dialihkan untuk <span className="font-semibold text-text-primary">{topPurpose.name}</span> sebesar <span className="font-semibold text-text-primary">{fmt(topPurpose.value)}</span>. Pastikan alokasi ini memiliki nilai urgensi tinggi demi mencegah kebocoran rencana anggaran Anda.
+                  </p>
+                )}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* SECTION 3: AKTIVITAS & INTENSITAS HARIAN (Daily Activity & Habits Card) */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 animate-scale-in">
+          {/* Kalender Pengeluaran (Lg: Col Span 2) */}
+          <div className="card p-5 lg:col-span-2 space-y-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-[13px] font-bold text-text-primary flex items-center gap-1.5">
+                  <Calendar className="w-4 h-4 text-accent" />
+                  Kalender & Intensitas Pengeluaran
+                </h3>
+                <p className="text-[10px] text-text-muted mt-0.5">Intensitas pengeluaran harian • Total {heatMonthLabel}: <span className="font-bold text-text-primary">{fmt(heatTotal)}</span></p>
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                <button
+                  onClick={() => {
+                    if (heatmapMonth === 0) { setHeatmapMonth(11); setHeatmapYear(y => y - 1); }
+                    else setHeatmapMonth(m => m - 1);
+                  }}
+                  className="w-8 h-8 rounded-xl border border-line bg-surface flex items-center justify-center hover:bg-surface-hover transition-all"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5 text-text-muted" />
+                </button>
+                <button
+                  onClick={() => {
+                    if (heatmapMonth === 11) { setHeatmapMonth(0); setHeatmapYear(y => y + 1); }
+                    else setHeatmapMonth(m => m + 1);
+                  }}
+                  className="w-8 h-8 rounded-xl border border-line bg-surface flex items-center justify-center hover:bg-surface-hover transition-all"
+                >
+                  <ChevronRight className="w-3.5 h-3.5 text-text-muted" />
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-5">
+              {/* Heatmap Grid (Col Span 3) */}
+              <div className="md:col-span-3 min-w-0 space-y-3">
+                <div className="grid grid-cols-7 text-center">
+                  {['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'].map(d => (
+                    <span key={d} className="text-[10px] text-text-muted font-medium py-0.5">{d}</span>
+                  ))}
+                </div>
+                <div className="space-y-1.5">
+                  {heatmapData.weeks.map((week, wi) => (
+                    <div key={wi} className="grid grid-cols-7 gap-1 md:gap-1.5">
+                      {week.map((day, di) => {
+                        const amount = getHeatAmount(day);
+                        const tier = heatTier(amount);
+                        if (day === null) return <div key={di} className="aspect-square" />;
+                        const today = new Date();
+                        const isToday = heatmapYear === today.getFullYear() && heatmapMonth === today.getMonth() && day === today.getDate();
+                        const isFuture = heatmapYear === today.getFullYear() && heatmapMonth === today.getMonth() && day > today.getDate();
+                        return (
+                          <div
+                            key={di}
+                            title={isFuture ? `${day} ${heatMonthLabel} — belum terjadi` : `${day} ${heatMonthLabel}: ${fmt(amount ?? 0)} (Klik untuk detail)`}
+                            style={isFuture ? { background: 'var(--color-surface-alt)', color: 'var(--color-text-muted)', opacity: 0.4 } : heatStyle(tier)}
+                            onClick={() => {
+                              if (!isFuture) {
+                                const dateKey = `${heatmapYear}-${String(heatmapMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                                setCalendarDetailDate(dateKey);
+                              }
+                            }}
+                            className={clsx(
+                              'aspect-square rounded-lg flex items-center justify-center text-[10px] md:text-[11px] font-semibold transition-all',
+                              isFuture ? 'cursor-default border border-dashed border-line' : 'cursor-pointer hover:scale-115 hover:shadow-lg active:scale-95 hover:ring-2 hover:ring-accent/40',
+                              tier === 0 && !isFuture && 'border border-line',
+                              isToday && 'ring-2 ring-accent ring-offset-1 dark:ring-offset-surface'
+                            )}
+                          >
+                            {day}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex items-center flex-wrap gap-x-2 gap-y-1 pt-3 border-t border-line">
+                  <span className="text-[8px] text-text-muted font-semibold uppercase mr-1">Skala:</span>
+                  <div className="flex items-center gap-1">
+                    <div className="w-2.5 h-2.5 rounded-[3px] border border-line" style={{ background: 'var(--heat-0-bg)' }} />
+                    <span className="text-[9px] text-text-muted">0</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-2.5 h-2.5 rounded-[3px]" style={{ background: 'var(--heat-1-bg)' }} />
+                    <span className="text-[9px] text-text-muted">Min</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-2.5 h-2.5 rounded-[3px]" style={{ background: 'var(--heat-2-bg)' }} />
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-2.5 h-2.5 rounded-[3px]" style={{ background: 'var(--heat-3-bg)' }} />
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-2.5 h-2.5 rounded-[3px]" style={{ background: 'var(--heat-4-bg)' }} />
+                    <span className="text-[9px] text-text-muted">Max</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Heatmap Stats (Col Span 2) */}
+              <div className="md:col-span-2 space-y-3">
+                <div className="rounded-xl bg-surface-alt/40 border border-line p-3 min-w-0">
+                  <p className="text-[8px] text-text-muted font-medium uppercase tracking-wider">Rata-rata/Hari Aktif</p>
+                  <p className="text-[13px] font-bold text-text-primary mt-0.5 truncate">{fmt(heatStats.avgPerDay)}</p>
+                  <p className="text-[8px] text-text-muted mt-0.5">{heatStats.activeDaysCount} hari berdata</p>
+                </div>
+                <div className="rounded-xl bg-surface-alt/40 border border-line p-3 min-w-0">
+                  <p className="text-[8px] text-text-muted font-medium uppercase tracking-wider">Pengeluaran Puncak</p>
+                  <p className="text-[12px] font-bold text-danger mt-0.5 truncate">
+                    {heatStats.peakDay.amount > 0 ? fmt(heatStats.peakDay.amount) : '-'}
+                  </p>
+                  <p className="text-[8px] text-text-muted mt-0.5">
+                    {heatStats.peakDay.amount > 0 ? `Tanggal ${heatStats.peakDay.day}` : 'Belum ada data'}
+                  </p>
+                </div>
+                <div className="rounded-xl bg-surface-alt/40 border border-line p-3 min-w-0">
+                  <p className="text-[8px] text-text-muted font-medium uppercase tracking-wider">Hari Aktif Belanja</p>
+                  <p className="text-[13px] font-bold text-text-primary mt-0.5">
+                    {heatStats.activeDaysCount}<span className="text-[10px] font-medium text-text-muted">/{heatPeriodDays}</span>
+                  </p>
+                  <p className="text-[8px] text-text-muted mt-0.5">{heatStats.zeroDays} hari hemat (Rp 0)</p>
                 </div>
               </div>
             </div>
           </div>
-        )}
 
-        {(topTransactions.incomes.length > 0 || topTransactions.expenses.length > 0) && (
-          <div className="card p-5 mt-4">
-            <h3 className="text-[13px] font-semibold text-text-primary mb-4">Transaksi Terbesar</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {topTransactions.expenses.length > 0 && (
-                <div>
-                  <p className="text-[11px] text-text-muted font-medium uppercase tracking-wider mb-3">Pengeluaran Terbesar</p>
-                  <div className="space-y-2">
-                    {topTransactions.expenses.map((tx, idx) => {
-                      const cat = categories.find((c: any) => c.id === tx.category_id);
-                      return (
-                        <div key={tx.id} className="flex items-center gap-3 text-[12px]">
-                          <span className="w-5 h-5 rounded-full bg-danger/10 text-danger flex items-center justify-center text-[10px] font-bold">{idx + 1}</span>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-text-primary truncate">{tx.description}</p>
-                            <p className="text-[10px] text-text-muted">{cat?.name || '-'}</p>
-                          </div>
-                          <span className="font-bold text-danger">-{fmt(Number(tx.amount))}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-              {topTransactions.incomes.length > 0 && (
-                <div>
-                  <p className="text-[11px] text-text-muted font-medium uppercase tracking-wider mb-3">Pemasukan Terbesar</p>
-                  <div className="space-y-2">
-                    {topTransactions.incomes.map((tx, idx) => {
-                      const acct = accounts.find((a: any) => a.id === tx.to_account_id);
-                      return (
-                        <div key={tx.id} className="flex items-center gap-3 text-[12px]">
-                          <span className="w-5 h-5 rounded-full bg-success/10 text-success flex items-center justify-center text-[10px] font-bold">{idx + 1}</span>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-text-primary truncate">{tx.description}</p>
-                            <p className="text-[10px] text-text-muted">{acct?.name || '-'}</p>
-                          </div>
-                          <span className="font-bold text-success">+{fmt(Number(tx.amount))}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
+          {/* Transaksi Terbesar (Lg: Col Span 1) */}
+          <div className="card p-5 space-y-4">
+            <div>
+              <h3 className="text-[13px] font-bold text-text-primary">Transaksi Terbesar</h3>
+              <p className="text-[10px] text-text-muted mt-0.5">Daftar transaksi tertinggi periode terpilih.</p>
             </div>
-          </div>
-        )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-5">
-          <div className="card p-5">
-            <h3 className="text-[13px] font-semibold text-text-primary mb-1">
-              {selectedMonth !== null ? 'Tren Bulanan' : 'Tren Bulanan'}
-            </h3>
-            {selectedMonth !== null && (
-              <p className="text-[10px] text-text-muted mb-3">Melihat data bulan {FULL_MONTH_NAMES[selectedMonth]} saja</p>
-            )}
-            <p className="text-[10px] text-text-muted mb-3">Klik bulan di chart untuk melihat detail</p>
-            <div className="h-64">
-              {monthData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={monthData} margin={{ top: 5, right: 5, left: -15, bottom: 0 }} onClick={(data) => {
-                    if (data && data.activeLabel) {
-                      const idx = MONTH_NAMES.indexOf(data.activeLabel);
-                      if (idx !== -1) handleMonthClick(idx);
-                    }
-                  }}>
-                    <XAxis dataKey="name" tick={{ fontSize: 12, fill: 'var(--color-text-muted)' }} tickLine={false} axisLine={false} />
-                    <YAxis tickFormatter={v => `${(v / 1000000).toFixed(1)}M`} tick={{ fontSize: 12, fill: 'var(--color-text-muted)' }} tickLine={false} axisLine={false} />
-                    <Tooltip formatter={(v: number) => fmt(v)} />
-                    <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '12px' }} />
-                    <Line
-                      type="monotone"
-                      dataKey="Pemasukan"
-                      stroke="var(--chart-1)"
-                      strokeWidth={2}
-                      dot={{ r: 4 }}
-                      activeDot={{ r: 6 }}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="Pengeluaran"
-                      stroke="var(--chart-5)"
-                      strokeWidth={2}
-                      dot={{ r: 4 }}
-                      activeDot={{ r: 6 }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
+            <div className="space-y-4">
+              {topTransactions.expenses.length > 0 ? (
+                <div className="space-y-2">
+                  <p className="text-[9px] text-text-muted font-bold uppercase tracking-wider">Pengeluaran</p>
+                  {topTransactions.expenses.slice(0, 3).map((tx, idx) => {
+                    const cat = categories.find((c: any) => c.id === tx.category_id);
+                    return (
+                      <div key={tx.id} className="flex items-center gap-2 text-[11px] border-b border-line/45 pb-1.5 last:border-0 last:pb-0">
+                        <span className="w-4 h-4 rounded-full bg-danger/10 text-danger flex items-center justify-center text-[8px] font-bold shrink-0">{idx + 1}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-text-primary truncate">{tx.description}</p>
+                          <p className="text-[8px] text-text-muted">{cat?.name || 'Tagihan'}</p>
+                        </div>
+                        <span className="font-bold text-danger shrink-0">-{fmt(Number(tx.amount))}</span>
+                      </div>
+                    );
+                  })}
+                </div>
               ) : (
-                <div className="h-full flex items-center justify-center text-text-muted text-sm">Belum ada data.</div>
+                <p className="text-[10px] text-text-muted text-center py-4">Belum ada pengeluaran.</p>
+              )}
+
+              {topTransactions.incomes.length > 0 && (
+                <div className="space-y-2 pt-2 border-t border-line/45">
+                  <p className="text-[9px] text-text-muted font-bold uppercase tracking-wider">Pemasukan</p>
+                  {topTransactions.incomes.slice(0, 2).map((tx, idx) => {
+                    const acct = accounts.find((a: any) => a.id === tx.to_account_id);
+                    return (
+                      <div key={tx.id} className="flex items-center gap-2 text-[11px] border-b border-line/45 pb-1.5 last:border-0 last:pb-0">
+                        <span className="w-4 h-4 rounded-full bg-success/10 text-success flex items-center justify-center text-[8px] font-bold shrink-0">{idx + 1}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-text-primary truncate">{tx.description}</p>
+                          <p className="text-[8px] text-text-muted">{acct?.name || '-'}</p>
+                        </div>
+                        <span className="font-bold text-success shrink-0">+{fmt(Number(tx.amount))}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* SECTION 4: ANALISIS GRAFIK TERPADU (Tren Bulanan & Pie Chart) */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 animate-scale-in">
+          {/* Tren Arus Kas Bulanan / Tren Pengeluaran Mingguan (Lg: Col Span 2) */}
+          <div className="card p-5 lg:col-span-2 space-y-4">
+            <div>
+              <h3 className="text-[13px] font-bold text-text-primary">
+                {selectedMonth !== null ? 'Tren Pengeluaran Mingguan' : 'Tren Arus Kas Bulanan'}
+              </h3>
+              <p className="text-[10px] text-text-muted mt-0.5">
+                {selectedMonth !== null
+                  ? `Analisis fluktuasi pengeluaran per minggu Anda pada bulan ${FULL_MONTH_NAMES[selectedMonth]} ${selectedYear}.`
+                  : 'Analisis tren pergerakan keluar masuk dana Anda.'}
+              </p>
+            </div>
+
+            <div className="h-64">
+              {selectedMonth !== null ? (
+                weeklySpendingChartData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={weeklySpendingChartData} margin={{ top: 5, right: 5, left: -15, bottom: 0 }}>
+                      <XAxis
+                        dataKey="name"
+                        tick={<CustomXAxisTick />}
+                        tickLine={false}
+                        axisLine={false}
+                        padding={{ left: 20, right: 20 }}
+                        interval={0}
+                      />
+                      <YAxis
+                        tickFormatter={v => v >= 1000000 ? `${(v / 1000000).toFixed(1)}jt` : v >= 1000 ? `${(v / 1000).toFixed(0)}rb` : String(v)}
+                        tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }}
+                        tickLine={false}
+                        axisLine={false}
+                      />
+                      <Tooltip formatter={(v: number) => fmt(v)} />
+                      <Bar
+                        dataKey="Pengeluaran"
+                        fill="var(--chart-5)"
+                        radius={[6, 6, 0, 0]}
+                        maxBarSize={36}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-full flex items-center justify-center text-text-muted text-[11px]">Belum ada data pengeluaran mingguan.</div>
+                )
+              ) : (
+                monthData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={monthData} margin={{ top: 5, right: 5, left: -15, bottom: 0 }} onClick={(data) => {
+                      if (data && data.activeLabel) {
+                        const idx = MONTH_NAMES.indexOf(data.activeLabel);
+                        if (idx !== -1) handleMonthClick(idx);
+                      }
+                    }}>
+                      <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--color-text-muted)' }} tickLine={false} axisLine={false} />
+                      <YAxis tickFormatter={v => `${(v / 1000000).toFixed(1)}M`} tick={{ fontSize: 11, fill: 'var(--color-text-muted)' }} tickLine={false} axisLine={false} />
+                      <Tooltip formatter={(v: number) => fmt(v)} />
+                      <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '11px' }} />
+                      <Line
+                        type="monotone"
+                        dataKey="Pemasukan"
+                        stroke="var(--chart-1)"
+                        strokeWidth={2}
+                        dot={{ r: 4 }}
+                        activeDot={{ r: 6 }}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="Pengeluaran"
+                        stroke="var(--chart-5)"
+                        strokeWidth={2}
+                        dot={{ r: 4 }}
+                        activeDot={{ r: 6 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-full flex items-center justify-center text-text-muted text-[11px]">Belum ada data tren.</div>
+                )
               )}
             </div>
           </div>
 
-          <div className="card p-5">
-            <h3 className="text-[13px] font-semibold text-text-primary mb-1">Distribusi Pengeluaran</h3>
-            {selectedMonth !== null && (
-              <p className="text-[10px] text-text-muted mb-3">Periode: {FULL_MONTH_NAMES[selectedMonth]} {selectedYear}</p>
-            )}
-            <div className="h-64 relative">
+          {/* Distribusi Kategori (Lg: Col Span 1) */}
+          <div className="card p-5 space-y-4">
+            <div>
+              <h3 className="text-[13px] font-bold text-text-primary">Proporsi Kategori Pengeluaran</h3>
+              <p className="text-[10px] text-text-muted mt-0.5">Pembagian persentase pengeluaran per kategori.</p>
+            </div>
+
+            <div className="h-48 relative">
               {expenseByCategory.length > 0 ? (
                 <>
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
-                      <Pie data={expenseByCategory} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={3} dataKey="value" stroke="none">
+                      <Pie data={expenseByCategory} cx="50%" cy="50%" innerRadius={42} outerRadius={64} paddingAngle={3} dataKey="value" stroke="none">
                         {expenseByCategory.map((_e, i) => (
                           <Cell key={i} fill={COLORS[i % COLORS.length]} />
                         ))}
                       </Pie>
                       <Tooltip
                         formatter={(v: number, name: string) => [`${fmt(v)} (${((v / totalExpense) * 100).toFixed(1)}%)`, name]}
-                        contentStyle={{
-                          backgroundColor: '#ffffff',
-                          border: '1px solid oklch(0.9297 0.0128 164.7776)',
-                          borderRadius: '12px',
-                          boxShadow: '0px 10px 30px 0px hsl(142 76% 10% / 0.10), 0px 2px 4px -1px hsl(142 76% 10% / 0.10)',
-                          fontSize: '12px',
-                          padding: '8px 12px',
-                        }}
                       />
-                      <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '11px' }} />
                     </PieChart>
                   </ResponsiveContainer>
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ marginBottom: 25, zIndex: 0 }}>
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ marginBottom: 12 }}>
                     <div className="text-center">
-                      <p className="text-[10px] text-text-muted">Total</p>
-                      <p className="text-[13px] font-bold text-text-primary">{fmt(totalExpense)}</p>
+                      <p className="text-[8px] text-text-muted">Total</p>
+                      <p className="text-[11px] font-bold text-text-primary truncate max-w-[80px]">{fmt(totalExpense)}</p>
                     </div>
                   </div>
                 </>
               ) : (
-                <div className="h-full flex items-center justify-center text-text-muted text-sm">Belum ada data.</div>
+                <div className="h-full flex items-center justify-center text-text-muted text-[11px]">Belum ada data kategori.</div>
               )}
             </div>
+
+            {/* Keterangan Warna Kategori (Legend) */}
+            {expenseByCategory.length > 0 && (
+              <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 pt-3 border-t border-line/50">
+                {expenseByCategory.map((item, i) => {
+                  const percent = totalExpense > 0 ? (item.value / totalExpense) * 100 : 0;
+                  return (
+                    <div key={item.name} className="flex items-center gap-1.5 text-[10px] font-medium text-text-secondary min-w-[70px] max-w-[120px]">
+                      <div
+                        className="w-2.5 h-2.5 rounded-[3px] shrink-0"
+                        style={{ backgroundColor: COLORS[i % COLORS.length] }}
+                      />
+                      <span className="truncate" title={item.name}>
+                        {item.name}{' '}
+                        <span className="text-[8px] text-text-muted font-normal">
+                          ({percent.toFixed(0)}%)
+                        </span>
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
 
+        {/* SECTION 5: RINCIAN TUJUAN PENGELUARAN (Tujuan Breakdown progress) */}
         {expenseByPurpose.length > 0 && (
-          <div className="card p-5 mt-4">
+          <div className="card p-5 mt-4 animate-scale-in">
             <div className="flex items-start justify-between gap-3 mb-1">
               <div>
-                <h3 className="text-[13px] font-semibold text-text-primary">Rincian per Tujuan Pengeluaran</h3>
+                <h3 className="text-[13px] font-bold text-text-primary">Rincian per Tujuan Pengeluaran</h3>
                 {selectedMonth !== null && (
                   <p className="text-[10px] text-text-muted mt-0.5">Periode: {FULL_MONTH_NAMES[selectedMonth]} {selectedYear}</p>
                 )}
               </div>
-              <span className="text-[10px] font-medium text-text-muted bg-surface-alt px-2 py-0.5 rounded-full whitespace-nowrap">
+              <span className="text-[10px] font-semibold text-text-muted bg-surface-alt px-2 py-0.5 rounded-full whitespace-nowrap">
                 {expenseByPurpose.length} tujuan
               </span>
             </div>
-            <div className="space-y-3 mt-3">
+            <div className="space-y-3.5 mt-3">
               {(showAllPurposes ? expenseByPurpose : expenseByPurpose.slice(0, 8)).map((p, idx) => {
                 const percent = totalExpense > 0 ? (p.value / totalExpense) * 100 : 0;
                 return (
                   <div key={p.name} className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center text-[11px] font-bold text-white" style={{ backgroundColor: COLORS[idx % COLORS.length] }}>
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-bold text-white shrink-0" style={{ backgroundColor: COLORS[idx % COLORS.length] }}>
                       #{idx + 1}
                     </div>
-                    <div className="flex-1">
-                      <div className="flex justify-between text-[12px] mb-1">
-                        <span className="font-medium text-text-primary">{p.name}</span>
-                        <span className="text-text-muted">{fmt(p.value)} <span className="text-[10px]">({percent.toFixed(1)}%)</span></span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between text-[11px] mb-1">
+                        <span className="font-semibold text-text-primary truncate mr-2">{p.name}</span>
+                        <span className="text-text-muted shrink-0">{fmt(p.value)} <span className="text-[9px]">({percent.toFixed(0)}%)</span></span>
                       </div>
                       <div className="h-2 bg-surface-alt rounded-full overflow-hidden">
                         <div className="h-full rounded-full transition-all duration-500" style={{ width: `${percent}%`, backgroundColor: COLORS[idx % COLORS.length] }} />
@@ -1735,7 +1738,7 @@ export default function Report() {
               </button>
             )}
             <div className="mt-4 pt-3 border-t border-line flex items-center justify-between">
-              <span className="text-[12px] font-semibold text-text-primary">Total</span>
+              <span className="text-[12px] font-semibold text-text-primary">Total Pengeluaran per Tujuan</span>
               <span className="text-[13px] font-bold text-text-primary">
                 {fmt(expenseByPurpose.reduce((sum, purpose) => sum + purpose.value, 0))}
               </span>
@@ -1743,6 +1746,96 @@ export default function Report() {
           </div>
         )}
       </div>
+      {calendarDetailDate && createPortal(
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in"
+          onClick={() => setCalendarDetailDate(null)}
+        >
+          <div 
+            className="bg-surface border border-line rounded-2xl w-full max-w-md overflow-hidden animate-scale-in shadow-2xl flex flex-col max-h-[85vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header Modal */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-line bg-surface-alt/10">
+              <div className="space-y-0.5">
+                <p className="text-[9px] text-text-muted font-bold uppercase tracking-wider">Detail Transaksi Kalender</p>
+                <h2 className="text-[14px] font-bold text-text-primary">
+                  {formattedCalendarDate}
+                </h2>
+              </div>
+              <button 
+                onClick={() => setCalendarDetailDate(null)} 
+                aria-label="Tutup modal" 
+                className="p-1.5 text-text-muted hover:text-text-primary hover:bg-surface-hover rounded-lg transition-all"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            {/* Body Scrollable */}
+            <div className="p-6 space-y-5 overflow-y-auto custom-scrollbar flex-1">
+              {/* Ringkasan Pengeluaran Harian */}
+              <div className="flex items-center justify-between p-3.5 bg-surface-alt/20 border border-line rounded-xl">
+                <span className="text-[12px] font-semibold text-text-secondary">Total Pengeluaran:</span>
+                <span className="text-[14px] font-bold text-danger">{fmt(calendarDateSpendingTotal)}</span>
+              </div>
+
+              {/* Daftar Rincian per Tujuan */}
+              <div className="space-y-4 pt-1">
+                {calendarDateSpendingByPurpose.length > 0 ? (
+                  calendarDateSpendingByPurpose.map((p, idx) => {
+                    const percent = calendarDateSpendingTotal > 0 ? (p.value / calendarDateSpendingTotal) * 100 : 0;
+                    return (
+                      <div key={p.name} className="flex items-center gap-3">
+                        <div 
+                          className="w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-bold text-white shrink-0 shadow-sm" 
+                          style={{ backgroundColor: COLORS[idx % COLORS.length] }}
+                        >
+                          #{idx + 1}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex justify-between text-[12px] mb-1">
+                            <span className="font-semibold text-text-primary truncate mr-2">{p.name}</span>
+                            <span className="text-text-muted shrink-0 font-semibold text-[11px]">
+                              {fmt(p.value)}{' '}
+                              <span className="text-[9px] font-normal">({percent.toFixed(0)}%)</span>
+                            </span>
+                          </div>
+                          <div className="h-2 bg-surface-alt rounded-full overflow-hidden">
+                            <div 
+                              className="h-full rounded-full transition-all duration-500" 
+                              style={{ width: `${percent}%`, backgroundColor: COLORS[idx % COLORS.length] }} 
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-8 text-center space-y-2">
+                    <span className="text-[28px] animate-bounce">🥳</span>
+                    <div>
+                      <p className="text-[13px] font-bold text-text-primary">Hari Hemat!</p>
+                      <p className="text-[11px] text-text-muted mt-0.5">Tidak ada catatan pengeluaran pada tanggal ini.</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Footer Modal */}
+            <div className="px-5 py-4 border-t border-line bg-surface-alt/10 flex justify-end">
+              <button
+                onClick={() => setCalendarDetailDate(null)}
+                className="bg-surface-alt/20 hover:bg-surface-alt/30 border border-line/50 font-bold text-[12px] px-4 py-2 rounded-xl transition-all active:scale-[0.98]"
+              >
+                Kembali
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
-import { Plus, ChevronRight, LogOut } from 'lucide-react';
+import { Plus, ChevronRight, LogOut, ArrowUpDown, ChevronUp, ChevronDown, Check } from 'lucide-react';
 import clsx from 'clsx';
 import SettingsModal from '../components/SettingsModal';
 import { toast } from '../components/Toast';
@@ -19,38 +19,125 @@ const tabs: { id: SettingTab; label: string }[] = [
   { id: 'tagihan', label: 'Tagihan' },
 ];
 
-function Section({ title, onAdd, children }: { title: string; onAdd?: () => void; children: React.ReactNode }) {
+function Section({
+  title,
+  onAdd,
+  headerAction,
+  children
+}: {
+  title: string;
+  onAdd?: () => void;
+  headerAction?: React.ReactNode;
+  children: React.ReactNode;
+}) {
   return (
     <div className="bg-surface border-y border-line md:border-x md:rounded-2xl md:mx-6 md:mt-6 mt-4 mb-6 relative overflow-hidden">
       <div className="px-5 py-3.5 border-b border-line flex items-center justify-between bg-surface-hover/50">
         <h2 className="text-[14px] font-bold text-text-primary tracking-tight">{title}</h2>
-        {onAdd && (
-          <button onClick={onAdd} className="bg-accent/10 text-accent hover:bg-accent/20 active:scale-95 transition-all text-[12px] font-semibold gap-1 px-3 py-1.5 rounded-full flex items-center">
-            <Plus className="w-3.5 h-3.5" /> Tambah Baru
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {headerAction}
+          {onAdd && (
+            <button onClick={onAdd} className="bg-accent/10 text-accent hover:bg-accent/20 active:scale-95 transition-all text-[12px] font-semibold gap-1 px-3 py-1.5 rounded-full flex items-center">
+              <Plus className="w-3.5 h-3.5" /> Tambah Baru
+            </button>
+          )}
+        </div>
       </div>
       <div>{children}</div>
     </div>
   );
 }
 
-function Item({ label, sub, trailing, iconUrl, onClick }: { label: string; sub?: string; trailing?: string; iconUrl?: string; onClick?: () => void }) {
-  return (
-    <button onClick={onClick} className="w-full flex items-center justify-between px-5 py-3.5 border-b border-line last:border-0 hover:bg-surface-hover transition-colors text-left active:bg-surface-alt group cursor-pointer">
-      <div className="flex items-center gap-4">
+function Item({
+  label,
+  sub,
+  trailing,
+  iconUrl,
+  onClick,
+  isReordering,
+  onMoveUp,
+  onMoveDown,
+  isFirst,
+  isLast
+}: {
+  label: string;
+  sub?: string;
+  trailing?: string;
+  iconUrl?: string;
+  onClick?: () => void;
+  isReordering?: boolean;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
+  isFirst?: boolean;
+  isLast?: boolean;
+}) {
+  const content = (
+    <>
+      <div className="flex items-center gap-4 flex-1 min-w-0">
         {iconUrl && (
           <img src={iconUrl} alt={label} className="w-10 h-10 rounded-xl object-cover object-center bg-surface border border-line flex-shrink-0" />
         )}
-        <div>
-          <p className="text-[14px] font-semibold text-text-primary group-hover:text-accent transition-colors">{label}</p>
-          {sub && <p className="text-[12px] font-medium text-text-muted mt-0.5">{sub}</p>}
+        <div className="min-w-0 flex-1">
+          <p className={clsx("text-[14px] font-semibold text-text-primary transition-colors truncate", !isReordering && "group-hover:text-accent")}>{label}</p>
+          {sub && <p className="text-[12px] font-medium text-text-muted mt-0.5 truncate">{sub}</p>}
         </div>
       </div>
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-shrink-0">
         {trailing && <span className="text-[13px] font-semibold text-text-primary">{trailing}</span>}
-        <ChevronRight className="w-4 h-4 text-text-muted opacity-50 group-hover:opacity-100 group-hover:text-accent transition-all" />
+        {isReordering ? (
+          <div className="flex items-center gap-1 bg-surface-alt dark:bg-surface-alt/80 p-0.5 rounded-lg border border-line">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onMoveUp) onMoveUp();
+              }}
+              disabled={isFirst}
+              className={clsx(
+                "p-1 rounded-md transition-all flex items-center justify-center",
+                isFirst
+                  ? "opacity-25 cursor-not-allowed text-text-muted"
+                  : "text-text-primary hover:bg-accent/15 hover:text-accent active:scale-90"
+              )}
+              title="Pindahkan Ke Atas"
+            >
+              <ChevronUp className="w-4 h-4" />
+            </button>
+            <div className="w-[1px] h-3.5 bg-line align-self-stretch my-auto" />
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onMoveDown) onMoveDown();
+              }}
+              disabled={isLast}
+              className={clsx(
+                "p-1 rounded-md transition-all flex items-center justify-center",
+                isLast
+                  ? "opacity-25 cursor-not-allowed text-text-muted"
+                  : "text-text-primary hover:bg-accent/15 hover:text-accent active:scale-90"
+              )}
+              title="Pindahkan Ke Bawah"
+            >
+              <ChevronDown className="w-4 h-4" />
+            </button>
+          </div>
+        ) : (
+          <ChevronRight className="w-4 h-4 text-text-muted opacity-50 group-hover:opacity-100 group-hover:text-accent transition-all" />
+        )}
       </div>
+    </>
+  );
+
+  if (isReordering) {
+    return (
+      <div className="w-full flex items-center justify-between px-5 py-3.5 border-b border-line last:border-0 transition-colors text-left bg-surface-hover/20">
+        {content}
+      </div>
+    );
+  }
+
+  return (
+    <button onClick={onClick} className="w-full flex items-center justify-between px-5 py-3.5 border-b border-line last:border-0 hover:bg-surface-hover transition-colors text-left active:bg-surface-alt group cursor-pointer">
+      {content}
     </button>
   );
 }
@@ -58,10 +145,25 @@ function Item({ label, sub, trailing, iconUrl, onClick }: { label: string; sub?:
 export default function Settings() {
   const [activeTab, setActiveTab] = useState<SettingTab>('akun');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isReordering, setIsReordering] = useState(false);
   const [editingItem, setEditingItem] = useState<any>(null);
   
   const { user, logout } = useAuth();
   const { accounts, sources, categories, purposes, wishlists, billPurposes, refresh } = useData();
+
+  const handleMoveAccount = async (idx: number, direction: 'up' | 'down') => {
+    const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (targetIdx < 0 || targetIdx >= accounts.length) return;
+
+    const newAccounts = [...accounts];
+    const temp = newAccounts[idx];
+    newAccounts[idx] = newAccounts[targetIdx];
+    newAccounts[targetIdx] = temp;
+
+    const orderIds = newAccounts.map(a => a.id);
+    localStorage.setItem('account_order_ids', JSON.stringify(orderIds));
+    await refresh();
+  };
 
   const handleSave = async (data: any, isEdit: boolean) => {
     if (!user) return false;
@@ -228,17 +330,16 @@ export default function Settings() {
       </div>
 
       {/* Modern Tabs */}
-      {/* Modern Tabs */}
       <div className="px-4 md:px-0 md:mx-6 mt-4">
         <div className="flex md:grid md:grid-cols-6 bg-surface-alt/10 dark:bg-surface-alt/40 p-1 rounded-2xl border border-line w-full overflow-x-auto md:overflow-visible no-scrollbar gap-1">
           {tabs.map(tab => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => { setActiveTab(tab.id); setIsReordering(false); }}
               className={clsx(
                 "px-2 md:px-3 py-2 rounded-xl text-[11px] md:text-[12px] leading-tight font-bold transition-all whitespace-nowrap md:whitespace-normal uppercase md:normal-case tracking-wider md:tracking-normal flex-1 md:flex md:items-center md:justify-center text-center",
                 activeTab === tab.id
-                  ? "bg-accent text-bg shadow-md shadow-accent/10 dark:shadow-accent/5"
+                  ? "bg-accent text-bg shadow-md shadow-accent/10 dark:shadow-accent/5 font-bold"
                   : "text-text-muted hover:text-text-primary hover:bg-surface-hover"
               )}
             >
@@ -250,8 +351,34 @@ export default function Settings() {
 
       <div className="mt-2 min-h-[50vh]">
          {activeTab === 'akun' && (
-           <Section title="Akun / Wallet Finansial" onAdd={() => { setEditingItem(null); setIsModalOpen(true); }}>
-             {accounts.map(a => (
+           <Section
+             title="Akun / Wallet Finansial"
+             onAdd={isReordering ? undefined : () => { setEditingItem(null); setIsModalOpen(true); }}
+             headerAction={
+               accounts.length > 1 && (
+                 <button
+                   onClick={() => setIsReordering(!isReordering)}
+                   className={clsx(
+                     "text-[12px] font-semibold gap-1.5 px-3 py-1.5 rounded-full flex items-center transition-all active:scale-95",
+                     isReordering
+                       ? "bg-accent text-bg shadow-md shadow-accent/10 dark:shadow-accent/5 font-bold"
+                       : "bg-surface-alt hover:bg-surface-hover border border-line text-text-primary"
+                   )}
+                 >
+                   {isReordering ? (
+                     <>
+                       <Check className="w-3.5 h-3.5" /> Selesai
+                     </>
+                   ) : (
+                     <>
+                       <ArrowUpDown className="w-3.5 h-3.5 animate-pulse" /> Atur Urutan
+                     </>
+                   )}
+                 </button>
+               )
+             }
+           >
+             {accounts.map((a, idx) => (
                <Item
                  key={a.id}
                  label={a.name}
@@ -259,6 +386,11 @@ export default function Settings() {
                  trailing={fmt(Number(a.balance))}
                  iconUrl={a.icon_url || undefined}
                  onClick={() => { setEditingItem(a); setIsModalOpen(true); }}
+                 isReordering={isReordering}
+                 onMoveUp={() => handleMoveAccount(idx, 'up')}
+                 onMoveDown={() => handleMoveAccount(idx, 'down')}
+                 isFirst={idx === 0}
+                 isLast={idx === accounts.length - 1}
                />
              ))}
              {accounts.length === 0 && <p className="text-center text-sm font-medium text-text-muted py-8">Belum ada akun diatur.</p>}

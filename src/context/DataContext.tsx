@@ -66,8 +66,27 @@ export function DataProvider({ children }: { children: ReactNode }) {
           .order('date', { ascending: false })
       ]);
       
+      const rawAccounts = acc.data || [];
+      let sortedAccounts = rawAccounts;
+      const savedOrder = localStorage.getItem('account_order_ids');
+      if (savedOrder) {
+        try {
+          const orderIds: string[] = JSON.parse(savedOrder);
+          sortedAccounts = [...rawAccounts].sort((a, b) => {
+            const indexA = orderIds.indexOf(a.id);
+            const indexB = orderIds.indexOf(b.id);
+            if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+            if (indexA !== -1) return -1;
+            if (indexB !== -1) return 1;
+            return 0;
+          });
+        } catch (e) {
+          console.error('Failed to sort accounts by custom order', e);
+        }
+      }
+
       setData({
-        accounts: acc.data || [],
+        accounts: sortedAccounts,
         categories: cat.data || [],
         purposes: pur.data || [],
         sources: src.data || [],
