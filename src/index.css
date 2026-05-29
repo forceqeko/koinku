@@ -48,6 +48,9 @@
   --color-success-muted: oklch(0.8090 0.1050 251.8130 / 0.12);
   --color-danger-muted: oklch(0.6368 0.2078 25.3313 / 0.12);
   --color-warning-muted: rgba(251, 191, 36, 0.12);
+  --color-success: oklch(0.6230 0.1688 149.1777);
+  --color-danger: var(--destructive);
+  --color-warning: oklch(0.7915 0.1400 85.0000);
 
   /* Heatmap palette (derived from theme accent) */
   --heat-0-bg: oklch(0.95 0.005 91.4 / 0.55);
@@ -124,6 +127,9 @@
   --color-success-muted: oklch(0.6907 0.1554 160.3454 / 0.12);
   --color-danger-muted: oklch(0.6188 0.2376 25.7658 / 0.12);
   --color-warning-muted: oklch(0.8214 0.1600 82.5337 / 0.14);
+  --color-success: oklch(0.6907 0.1554 160.3454);
+  --color-danger: var(--destructive);
+  --color-warning: oklch(0.8214 0.1600 82.5337);
 
   /* Heatmap palette - celestial blue */
   --heat-0-bg: oklch(0.95 0.01 230 / 0.55);
@@ -194,6 +200,9 @@
   --color-success-muted: oklch(0.7763 0.2066 149.52 / 0.18);
   --color-danger-muted: oklch(0.5875 0.2303 28.26 / 0.20);
   --color-warning-muted: oklch(0.8512 0.1670 93.13 / 0.18);
+  --color-success: var(--primary);
+  --color-danger: var(--destructive);
+  --color-warning: oklch(0.8512 0.1670 93.1252);
 
   /* Heatmap palette - dark theme */
   --heat-0-bg: oklch(0.25 0.02 162.74 / 0.55);
@@ -354,9 +363,9 @@
     font-weight: 500;
   }
   .badge-neutral { background-color: var(--color-accent-muted); color: var(--color-text-secondary); }
-  .badge-success { background-color: var(--color-success-muted); color: #34d399; }
-  .badge-danger { background-color: var(--color-danger-muted); color: #fb7185; }
-  .badge-warning { background-color: var(--color-warning-muted); color: #fbbf24; }
+  .badge-success { background-color: var(--color-success-muted); color: var(--color-success); }
+  .badge-danger { background-color: var(--color-danger-muted); color: var(--color-danger); }
+  .badge-warning { background-color: var(--color-warning-muted); color: var(--color-warning); }
 }
 
 /* ─── Recharts ──────────────────────────────── */

@@ -24,15 +24,15 @@ export default {
           muted: 'var(--color-accent-muted)',
         },
         success: {
-          DEFAULT: '#34d399',
+          DEFAULT: 'var(--color-success)',
           muted: 'var(--color-success-muted)',
         },
         danger: {
-          DEFAULT: '#fb7185',
+          DEFAULT: 'var(--color-danger)',
           muted: 'var(--color-danger-muted)',
         },
         warning: {
-          DEFAULT: '#fbbf24',
+          DEFAULT: 'var(--color-warning)',
           muted: 'var(--color-warning-muted)',
         },
       },

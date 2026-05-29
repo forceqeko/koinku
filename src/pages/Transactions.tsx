@@ -331,20 +331,20 @@ export default function Transactions() {
         {/* top controls: month selector, year, tabs, & add button */}
         <div className="space-y-4">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div className="flex items-center justify-between gap-3 w-full md:w-auto">
-              <div className="flex items-center gap-3">
-                <div className="relative" ref={monthPickerRef}>
+            <div className="flex items-center justify-between gap-1.5 sm:gap-2 w-full md:w-auto">
+              <div className="flex items-center gap-1.5 sm:gap-2 flex-1 md:flex-initial min-w-0">
+                <div className="relative shrink-0 sm:flex-1 md:flex-initial" ref={monthPickerRef}>
                   <button 
                     onClick={() => setIsMonthPickerOpen(!isMonthPickerOpen)}
-                    className="bg-surface border border-line px-5 py-2.5 rounded-2xl flex items-center gap-3 shadow-sm hover:border-accent/40 transition-all font-bold text-[13px] text-text-primary min-w-[170px] md:min-w-[180px] justify-between group h-[46px]"
+                    className="bg-surface border border-line px-2.5 sm:px-3.5 py-2.5 rounded-2xl flex items-center gap-1 sm:gap-2 shadow-sm hover:border-accent/40 transition-all font-bold text-[12px] sm:text-[13px] text-text-primary min-w-[70px] sm:min-w-[170px] md:min-w-[180px] justify-between group h-[46px] w-full"
                   >
-                     <div className="flex items-center gap-2.5">
-                        <div className="w-7 h-7 rounded-lg bg-accent/10 flex items-center justify-center">
+                     <div className="flex items-center gap-1 sm:gap-2 truncate">
+                        <div className="hidden sm:flex w-7 h-7 rounded-lg bg-accent/10 items-center justify-center shrink-0">
                           <Calendar className="w-4 h-4 text-accent" />
                         </div>
-                        <span className="truncate">{months[selectedMonth]}</span>
+                        <span className="truncate max-w-[50px] sm:max-w-none">{months[selectedMonth]}</span>
                      </div>
-                     <ChevronDown className={clsx("w-4 h-4 text-text-muted transition-transform duration-300", isMonthPickerOpen && "rotate-180")} />
+                     <ChevronDown className={clsx("w-3 h-3 sm:w-3.5 sm:h-3.5 text-text-muted transition-transform duration-300 shrink-0", isMonthPickerOpen && "rotate-180")} />
                   </button>
                   
                   {isMonthPickerOpen && (
@@ -358,7 +358,7 @@ export default function Transactions() {
                               "w-full px-4 py-2.5 rounded-xl text-left text-[13px] transition-all flex items-center justify-between group",
                               selectedMonth === idx 
                                 ? "bg-accent text-white font-bold" 
-                                : "text-text-primary hoven:bg-surface-hover hover:text-accent font-medium"
+                                : "text-text-primary hover:bg-surface-hover hover:text-accent font-medium"
                             )}
                           >
                             {m}
@@ -371,13 +371,13 @@ export default function Transactions() {
                 </div>
 
                 {/* Year Picker */}
-                <div className="relative" ref={yearPickerRef}>
+                <div className="relative shrink-0" ref={yearPickerRef}>
                   <button 
                     onClick={() => setIsYearPickerOpen(!isYearPickerOpen)}
-                    className="bg-surface border border-line px-5 py-2.5 rounded-2xl flex items-center gap-3 shadow-sm hover:border-accent/40 transition-all font-bold text-[13px] text-text-primary justify-between group h-[46px]"
+                    className="bg-surface border border-line px-2 sm:px-3 py-2.5 rounded-2xl flex items-center gap-1 sm:gap-2 shadow-sm hover:border-accent/40 transition-all font-bold text-[12px] sm:text-[13px] text-text-primary justify-between group h-[46px]"
                   >
                     <span>{selectedYear}</span>
-                    <ChevronDown className={clsx("w-4 h-4 text-text-muted transition-transform duration-300", isYearPickerOpen && "rotate-180")} />
+                    <ChevronDown className={clsx("w-3 h-3 sm:w-3.5 sm:h-3.5 text-text-muted transition-transform duration-300", isYearPickerOpen && "rotate-180")} />
                   </button>
 
                   {isYearPickerOpen && (
@@ -404,21 +404,22 @@ export default function Transactions() {
                 </div>
               </div>
 
-              <div className="flex gap-2 shrink-0 md:hidden">
+              {/* Mobile Actions: Compact Rounded Buttons */}
+              <div className="flex gap-1.5 sm:gap-2 shrink-0 md:hidden">
                 <button 
                   onClick={() => setIsScanModalOpen(true)}
-                  className="bg-surface border border-line hover:border-accent/40 text-text-primary flex items-center justify-center gap-2 h-[46px] px-3 rounded-2xl active:scale-95 transition-all font-bold text-[13px]"
+                  className="bg-surface border border-line hover:border-accent/40 text-text-primary flex items-center justify-center w-[46px] h-[46px] rounded-2xl active:scale-95 transition-all shrink-0"
                   title="Scan Struk dengan AI"
                 >
-                  <ScanLine className="w-4.5 h-4.5 text-accent" />
-                  <span className="hidden sm:inline">Scan Struk</span>
+                  <ScanLine className="w-5 h-5 text-accent" />
                 </button>
                 <button 
                   onClick={() => { setEditingTx(null); setIsModalOpen(true); }}
-                  className="btn btn-primary shadow-lg shadow-accent/20 flex items-center justify-center gap-2 h-[46px] px-4.5 rounded-2xl active:scale-95 transition-all shrink-0"
+                  className="btn btn-primary shadow-lg shadow-accent/20 flex items-center justify-center gap-1.5 h-[46px] px-3 sm:px-4 rounded-2xl active:scale-95 transition-all font-bold text-[13px] shrink-0"
+                  title="Tambah Transaksi"
                 >
-                  <Plus className="w-4 h-4" />
-                  <span className="font-bold text-[13px]">Tambah</span>
+                  <Plus className="w-4 h-4 shrink-0" />
+                  <span>Tambah</span>
                 </button>
               </div>
             </div>

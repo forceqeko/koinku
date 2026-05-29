@@ -241,21 +241,6 @@ export default function Report() {
     return { totalIncome, totalExpense, totalSaving, avgMonthlyIncome, avgMonthlyExpense, topExpenseCategory, bestMonth, worstMonth, divisor };
   }, [filteredTx, expenseByCategory, monthData, selectedMonth]);
 
-  const yearAverageExpense = useMemo(() => {
-    const activeMonths = monthData.filter(m => m.Pemasukan > 0 || m.Pengeluaran > 0);
-    const divisor = Math.max(activeMonths.length, 1);
-    const yearExpenseTotal = monthData.reduce((sum, month) => sum + month.Pengeluaran, 0);
-    return yearExpenseTotal / divisor;
-  }, [monthData]);
-
-  const averageDailyExpense = useMemo(() => {
-    if (selectedMonth === null) return 0;
-    const today = new Date();
-    const isCurrentMonth = selectedYear === today.getFullYear() && selectedMonth === today.getMonth();
-    const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
-    const divisor = isCurrentMonth ? today.getDate() : daysInMonth;
-    return divisor > 0 ? summary.totalExpense / divisor : 0;
-  }, [selectedMonth, selectedYear, summary.totalExpense]);
 
   const totalExpense = expenseByCategory.reduce((a, b) => a + b.value, 0);
 
@@ -286,11 +271,45 @@ export default function Report() {
       ? `${FULL_MONTH_NAMES[selectedMonth === 0 ? 11 : selectedMonth - 1]} ${selectedMonth === 0 ? selectedYear - 1 : selectedYear}`
       : `${selectedYear - 1}`;
 
+    if (selectedMonth !== null) {
+      return {
+        incomeChange: calcChange(summary.totalIncome, prevPeriodSummary.totalIncome),
+        expenseChange: calcChange(summary.totalExpense, prevPeriodSummary.totalExpense),
+        savingChange: calcChange(summary.totalSaving, prevPeriodSummary.totalSaving),
+        prevPeriodLabel,
+      };
+    }
+
+    // Yearly Mode: Normalize by number of active months (divisor) to prevent data gap distortion
+    const currentYearDivisor = summary.divisor;
+    const currentYearAvgIncome = summary.totalIncome / currentYearDivisor;
+    const currentYearAvgExpense = summary.totalExpense / currentYearDivisor;
+    const currentYearAvgSaving = summary.totalSaving / currentYearDivisor;
+
+    // Calculate active months in previous year
+    const prevYearMonthsWithData = new Set<number>();
+    prevYearTx.forEach(t => {
+      const d = new Date(t.date);
+      const income = t.type === 'income' ? Number(t.amount) : 0;
+      const expense = expenseAmount(t);
+      const saving = t.type === 'saving' ? Number(t.amount) : 0;
+      if (income > 0 || expense > 0 || saving > 0) {
+        prevYearMonthsWithData.add(d.getMonth());
+      }
+    });
+    const prevYearDivisor = Math.max(prevYearMonthsWithData.size, 1);
+    const prevYearAvgIncome = prevPeriodSummary.totalIncome / prevYearDivisor;
+    const prevYearAvgExpense = prevPeriodSummary.totalExpense / prevYearDivisor;
+    const prevYearAvgSaving = prevPeriodSummary.totalSaving / prevYearDivisor;
+
     return {
-      incomeChange: calcChange(summary.totalIncome, prevPeriodSummary.totalIncome),
-      expenseChange: calcChange(summary.totalExpense, prevPeriodSummary.totalExpense),
-      savingChange: calcChange(summary.totalSaving, prevPeriodSummary.totalSaving),
+      incomeChange: calcChange(currentYearAvgIncome, prevYearAvgIncome),
+      expenseChange: calcChange(currentYearAvgExpense, prevYearAvgExpense),
+      savingChange: calcChange(currentYearAvgSaving, prevYearAvgSaving),
       prevPeriodLabel,
+      isNormalized: true,
+      currentYearDivisor,
+      prevYearDivisor,
     };
   }, [selectedMonth, selectedYear, summary, prevMonthTx, prevYearTx]);
 
@@ -526,12 +545,36 @@ export default function Report() {
       midDays,
       highDays,
     };
-  }, [heatmapData, dailySpending.lookup, dailySpending.maxAmount]);
+  }, [heatmapData, heatmapDailySpending.lookup, heatmapDailySpending.maxAmount]);
 
   const heatTotal = heatStats.total;
 
   const isCurrentHeatMonth = heatmapYear === new Date().getFullYear() && heatmapMonth === new Date().getMonth();
   const heatPeriodDays = isCurrentHeatMonth ? new Date().getDate() : heatmapData.daysInMonth;
+
+  const pokokExpensesTotal = useMemo(() => {
+    const pokokExpenses = heatmapTx.filter(t => {
+      if (t.type !== 'expense' && t.type !== 'bill') return false;
+      const cat = categories.find((c: any) => c.id === t.category_id);
+      const catName = (cat?.name || '').toLowerCase();
+      const pur = purposes.find((p: any) => p.id === t.purpose_id);
+      const purName = (pur?.name || '').toLowerCase();
+      
+      return (
+        catName.includes('pokok') ||
+        catName.includes('primer') ||
+        catName.includes('makanan') ||
+        catName.includes('belanja') ||
+        catName.includes('rutin') ||
+        purName.includes('pokok') ||
+        purName.includes('primer') ||
+        purName.includes('makanan') ||
+        purName.includes('belanja') ||
+        purName.includes('rutin')
+      );
+    });
+    return pokokExpenses.reduce((sum, t) => sum + Number(t.amount), 0);
+  }, [heatmapTx, categories, purposes]);
 
   const cashFlow = useMemo(() => {
     const totalIncome = summary.totalIncome;
@@ -1133,44 +1176,31 @@ export default function Report() {
             </div>
           </div>
 
-          {/* Rata-Rata Bulanan & Perbandingan Tahun/Hari */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2">
-            <div className="p-3 bg-surface-alt/20 rounded-xl border border-line/40 min-w-0">
-              <p className="text-[10px] text-text-muted font-medium">Rata-rata Masuk/Bulan</p>
-              <p className="text-[13px] font-bold text-success mt-0.5 truncate">{fmt(summary.avgMonthlyIncome)}</p>
-              {selectedMonth === null && <p className="text-[9px] text-text-muted mt-0.5">dari {summary.divisor} bulan</p>}
-            </div>
-            <div className="p-3 bg-surface-alt/20 rounded-xl border border-line/40 min-w-0">
-              <p className="text-[10px] text-text-muted font-medium">Rata-rata Keluar/Bulan</p>
-              <p className="text-[13px] font-bold text-danger mt-0.5 truncate">{fmt(summary.avgMonthlyExpense)}</p>
-              {selectedMonth === null && <p className="text-[9px] text-text-muted mt-0.5">dari {summary.divisor} bulan</p>}
-            </div>
-            <div className="p-3 bg-surface-alt/20 rounded-xl border border-line/40 min-w-0">
-              <p className="text-[10px] text-text-muted font-medium">
-                {selectedMonth !== null ? 'Rata-rata Keluar/Tahun' : 'Total Keluar/Tahun'}
-              </p>
-              <p className="text-[13px] font-bold text-danger mt-0.5 truncate">
-                {fmt(selectedMonth !== null ? yearAverageExpense : summary.totalExpense)}
-              </p>
-              {selectedMonth !== null && <p className="text-[9px] text-text-muted mt-0.5">tahun {selectedYear}</p>}
-            </div>
-            <div className="p-3 bg-surface-alt/20 rounded-xl border border-line/40 min-w-0">
-              <p className="text-[10px] text-text-muted font-medium">
-                {selectedMonth !== null ? 'Rata-rata Keluar/Hari' : 'Puncak Keluar (Bulan)'}
-              </p>
-              <p className="text-[13px] font-bold text-danger mt-0.5 truncate">
-                {selectedMonth !== null ? fmt(averageDailyExpense) : (summary.worstMonth?.name || '-')}
-              </p>
-              {selectedMonth !== null && (
-                <p className="text-[9px] text-text-muted mt-0.5">
-                  {selectedYear === new Date().getFullYear() && selectedMonth === new Date().getMonth()
-                    ? `${new Date().getDate()} hari berjalan`
-                    : `${new Date(selectedYear, selectedMonth + 1, 0).getDate()} hari penuh`}
+          {/* Rata-Rata Bulanan & Perbandingan Tahun/Hari (Khusus Tahunan) */}
+          {selectedMonth === null && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2">
+              <div className="p-3 bg-surface-alt/20 rounded-xl border border-line/40 min-w-0">
+                <p className="text-[10px] text-text-muted font-medium">Rata-rata Masuk/Bulan</p>
+                <p className="text-[13px] font-bold text-success mt-0.5 truncate">{fmt(summary.avgMonthlyIncome)}</p>
+                <p className="text-[9px] text-text-muted mt-0.5">dari {summary.divisor} bulan</p>
+              </div>
+              <div className="p-3 bg-surface-alt/20 rounded-xl border border-line/40 min-w-0">
+                <p className="text-[10px] text-text-muted font-medium">Rata-rata Keluar/Bulan</p>
+                <p className="text-[13px] font-bold text-danger mt-0.5 truncate">{fmt(summary.avgMonthlyExpense)}</p>
+                <p className="text-[9px] text-text-muted mt-0.5">dari {summary.divisor} bulan</p>
+              </div>
+              <div className="p-3 bg-surface-alt/20 rounded-xl border border-line/40 min-w-0">
+                <p className="text-[10px] text-text-muted font-medium">Total Keluar/Tahun</p>
+                <p className="text-[13px] font-bold text-danger mt-0.5 truncate">{fmt(summary.totalExpense)}</p>
+              </div>
+              <div className="p-3 bg-surface-alt/20 rounded-xl border border-line/40 min-w-0">
+                <p className="text-[10px] text-text-muted font-medium">Puncak Keluar (Bulan)</p>
+                <p className="text-[13px] font-bold text-danger mt-0.5 truncate">
+                  {summary.worstMonth?.name || '-'}
                 </p>
-              )}
+              </div>
             </div>
-          </div>
-
+          )}
           {/* Perbandingan Periode Sebelumnya (Khusus Tahunan) */}
           {selectedMonth === null && (
             <div className="p-3 bg-surface-alt/30 border border-line/50 rounded-xl flex flex-col md:flex-row md:items-center justify-between text-[11px] gap-2">
@@ -1344,6 +1374,33 @@ export default function Report() {
                   </p>
                 )}
 
+                {monthOverMonth.expenseChange !== null && (
+                  <p>
+                    {monthOverMonth.expenseChange > 0 ? (
+                      <span>
+                        📊 **Tren Pengeluaran Naik:** Rata-rata pengeluaran bulanan Anda {selectedMonth !== null ? 'bulan' : 'tahun'} ini {' '}
+                        <span className="font-semibold text-danger">naik {monthOverMonth.expenseChange.toFixed(1)}%</span> {' '}
+                        dibandingkan {selectedMonth !== null ? 'bulan' : 'tahun'} sebelumnya ({monthOverMonth.prevPeriodLabel})
+                        {selectedMonth === null && ` (dihitung proporsional dari ${'isNormalized' in monthOverMonth ? (monthOverMonth as any).currentYearDivisor : 0} bulan aktif vs ${'isNormalized' in monthOverMonth ? (monthOverMonth as any).prevYearDivisor : 0} bulan aktif)`}.
+                        Cobalah untuk mengevaluasi kembali pos pengeluaran yang tidak mendesak demi menjaga arus kas tetap stabil.
+                      </span>
+                    ) : monthOverMonth.expenseChange < 0 ? (
+                      <span>
+                        🎉 **Efisiensi Anggaran Sukses:** Rata-rata pengeluaran bulanan Anda {selectedMonth !== null ? 'bulan' : 'tahun'} ini {' '}
+                        <span className="font-semibold text-success">turun {Math.abs(monthOverMonth.expenseChange).toFixed(1)}%</span> {' '}
+                        dibandingkan {selectedMonth !== null ? 'bulan' : 'tahun'} sebelumnya ({monthOverMonth.prevPeriodLabel})
+                        {selectedMonth === null && ` (dihitung proporsional dari ${'isNormalized' in monthOverMonth ? (monthOverMonth as any).currentYearDivisor : 0} bulan aktif vs ${'isNormalized' in monthOverMonth ? (monthOverMonth as any).prevYearDivisor : 0} bulan aktif)`}.
+                        Pencapaian hemat yang sangat luar biasa, pertahankan pola belanja sehat ini!
+                      </span>
+                    ) : (
+                      <span>
+                        ⚖️ **Pengeluaran Stabil:** Rata-rata pengeluaran bulanan Anda {selectedMonth !== null ? 'bulan' : 'tahun'} ini stabil, sama persis dengan {selectedMonth !== null ? 'bulan' : 'tahun'} sebelumnya ({monthOverMonth.prevPeriodLabel})
+                        {selectedMonth === null && ` (dihitung proporsional dari ${'isNormalized' in monthOverMonth ? (monthOverMonth as any).currentYearDivisor : 0} bulan aktif vs ${'isNormalized' in monthOverMonth ? (monthOverMonth as any).prevYearDivisor : 0} bulan aktif)`}.
+                      </span>
+                    )}
+                  </p>
+                )}
+
                 {topCategory && (
                   <p>
                     🍔 Pemicu pengeluaran terbesar bersumber dari kategori <span className="font-semibold text-text-primary">{topCategory.name}</span> sebesar <span className="font-semibold text-danger">{fmt(topCategory.value)}</span> ({((topCategory.value / summary.totalExpense) * 100).toFixed(0)}% dari total pengeluaran). {topCategory.name === 'Makanan' ? 'Mengurangi frekuensi makan di luar di akhir pekan dapat menghemat pengeluaran bulanan Anda secara signifikan.' : 'Cobalah untuk menaruh plafon budget maksimum bulanan khusus untuk kategori tersebut.'}
@@ -1464,9 +1521,11 @@ export default function Report() {
               {/* Heatmap Stats (Col Span 2) */}
               <div className="md:col-span-2 space-y-3">
                 <div className="rounded-xl bg-surface-alt/40 border border-line p-3 min-w-0">
-                  <p className="text-[8px] text-text-muted font-medium uppercase tracking-wider">Rata-rata/Hari Aktif</p>
-                  <p className="text-[13px] font-bold text-text-primary mt-0.5 truncate">{fmt(heatStats.avgPerDay)}</p>
-                  <p className="text-[8px] text-text-muted mt-0.5">{heatStats.activeDaysCount} hari berdata</p>
+                  <p className="text-[8px] text-text-muted font-medium uppercase tracking-wider">Rata-rata Pengeluaran per Hari</p>
+                  <p className="text-[13px] font-bold text-text-primary mt-0.5 truncate">
+                    {fmt(heatPeriodDays > 0 ? heatTotal / heatPeriodDays : 0)}
+                  </p>
+                  <p className="text-[8px] text-text-muted mt-0.5">Rata-rata dari {heatPeriodDays} hari berjalan</p>
                 </div>
                 <div className="rounded-xl bg-surface-alt/40 border border-line p-3 min-w-0">
                   <p className="text-[8px] text-text-muted font-medium uppercase tracking-wider">Pengeluaran Puncak</p>
@@ -1478,11 +1537,69 @@ export default function Report() {
                   </p>
                 </div>
                 <div className="rounded-xl bg-surface-alt/40 border border-line p-3 min-w-0">
-                  <p className="text-[8px] text-text-muted font-medium uppercase tracking-wider">Hari Aktif Belanja</p>
-                  <p className="text-[13px] font-bold text-text-primary mt-0.5">
-                    {heatStats.activeDaysCount}<span className="text-[10px] font-medium text-text-muted">/{heatPeriodDays}</span>
+                  <p className="text-[8px] text-text-muted font-medium uppercase tracking-wider">Rata-rata Pokok per Hari</p>
+                  <p className="text-[13px] font-bold text-text-primary mt-0.5 truncate">
+                    {fmt(heatPeriodDays > 0 ? pokokExpensesTotal / heatPeriodDays : 0)}
                   </p>
-                  <p className="text-[8px] text-text-muted mt-0.5">{heatStats.zeroDays} hari hemat (Rp 0)</p>
+                  <p className="text-[8px] text-text-muted mt-0.5">Total Pokok: {fmt(pokokExpensesTotal)}</p>
+                </div>
+
+                {/* Pola Belanja: Hari Kerja vs Akhir Pekan */}
+                <div className="rounded-xl bg-surface-alt/40 border border-line p-3 min-w-0 space-y-2.5">
+                  <p className="text-[8px] text-text-muted font-medium uppercase tracking-wider">Pola Belanja</p>
+                  
+                  {(() => {
+                    const maxVal = Math.max(heatStats.avgWeekday, heatStats.avgWeekend, 1);
+                    const weekdayPct = (heatStats.avgWeekday / maxVal) * 100;
+                    const weekendPct = (heatStats.avgWeekend / maxVal) * 100;
+                    const isWeekendHigher = heatStats.avgWeekend > heatStats.avgWeekday;
+                    return (
+                      <div className="space-y-2">
+                        {/* Hari Kerja */}
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[9px] font-semibold text-text-secondary">Senin – Jumat</span>
+                            <span className="text-[10px] font-bold text-text-primary truncate ml-1">{fmt(heatStats.avgWeekday)}</span>
+                          </div>
+                          <div className="h-2 bg-surface-alt rounded-full overflow-hidden">
+                            <div
+                              className="h-full rounded-full transition-all duration-700 ease-out"
+                              style={{
+                                width: `${Math.max(weekdayPct, 4)}%`,
+                                backgroundColor: !isWeekendHigher ? 'var(--color-danger)' : 'var(--color-success)',
+                              }}
+                            />
+                          </div>
+                        </div>
+                        {/* Akhir Pekan */}
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[9px] font-semibold text-text-secondary">Sabtu – Minggu</span>
+                            <span className="text-[10px] font-bold text-text-primary truncate ml-1">{fmt(heatStats.avgWeekend)}</span>
+                          </div>
+                          <div className="h-2 bg-surface-alt rounded-full overflow-hidden">
+                            <div
+                              className="h-full rounded-full transition-all duration-700 ease-out"
+                              style={{
+                                width: `${Math.max(weekendPct, 4)}%`,
+                                backgroundColor: isWeekendHigher ? 'var(--color-danger)' : 'var(--color-success)',
+                              }}
+                            />
+                          </div>
+                        </div>
+                        {/* Insight kecil */}
+                        <p className="text-[8px] text-text-muted pt-0.5">
+                          {heatStats.avgWeekday === 0 && heatStats.avgWeekend === 0
+                            ? 'Belum ada data belanja'
+                            : isWeekendHigher
+                              ? `Akhir pekan ${heatStats.avgWeekday > 0 ? ((heatStats.avgWeekend / heatStats.avgWeekday - 1) * 100).toFixed(0) : '∞'}% lebih boros`
+                              : heatStats.avgWeekend > 0
+                                ? `Hari kerja ${((heatStats.avgWeekday / heatStats.avgWeekend - 1) * 100).toFixed(0)}% lebih boros`
+                                : 'Tidak ada belanja di akhir pekan'}
+                        </p>
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
             </div>
