@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import TransactionModal from '../components/TransactionModal';
-import { Plus, ChevronDown, ArrowUp, ArrowDown, ArrowUpDown, Calendar, Search } from 'lucide-react';
+import ReceiptScanModal from '../components/ReceiptScanModal';
+import { Plus, ChevronDown, ArrowUp, ArrowDown, ArrowUpDown, Calendar, Search, ScanLine } from 'lucide-react';
 import clsx from 'clsx';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
@@ -34,6 +35,7 @@ const itemsPerPageOptions: ItemsPerPage[] = [10, 25, 50, 100];
 export default function Transactions() {
   const [activeTab, setActiveTab] = useState<Tab>('expense');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isScanModalOpen, setIsScanModalOpen] = useState(false);
   const [editingTx, setEditingTx] = useState<Transaction | null>(null);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -402,13 +404,23 @@ export default function Transactions() {
                 </div>
               </div>
 
-              <button 
-                onClick={() => { setEditingTx(null); setIsModalOpen(true); }}
-                className="btn btn-primary shadow-lg shadow-accent/20 flex items-center justify-center gap-2 h-[46px] px-4 rounded-2xl active:scale-95 transition-all shrink-0 md:hidden"
-              >
-                <Plus className="w-4 h-4" />
-                <span className="font-bold text-[13px]">Tambah</span>
-              </button>
+              <div className="flex gap-2 shrink-0 md:hidden">
+                <button 
+                  onClick={() => setIsScanModalOpen(true)}
+                  className="bg-surface border border-line hover:border-accent/40 text-text-primary flex items-center justify-center gap-2 h-[46px] px-3 rounded-2xl active:scale-95 transition-all font-bold text-[13px]"
+                  title="Scan Struk dengan AI"
+                >
+                  <ScanLine className="w-4.5 h-4.5 text-accent" />
+                  <span className="hidden sm:inline">Scan Struk</span>
+                </button>
+                <button 
+                  onClick={() => { setEditingTx(null); setIsModalOpen(true); }}
+                  className="btn btn-primary shadow-lg shadow-accent/20 flex items-center justify-center gap-2 h-[46px] px-4.5 rounded-2xl active:scale-95 transition-all shrink-0"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span className="font-bold text-[13px]">Tambah</span>
+                </button>
+              </div>
             </div>
 
             <div className="hidden md:flex md:items-center md:gap-3 md:flex-1 md:justify-end">
@@ -422,6 +434,14 @@ export default function Transactions() {
                   className="input h-[46px] rounded-2xl pl-11 pr-4 shadow-sm"
                 />
               </div>
+
+              <button 
+                onClick={() => setIsScanModalOpen(true)}
+                className="bg-surface border border-line hover:border-accent/40 text-text-primary flex items-center justify-center gap-2.5 h-[46px] px-4 rounded-2xl active:scale-95 transition-all shrink-0 font-bold text-[14px]"
+              >
+                <ScanLine className="w-4.5 h-4.5 text-accent" />
+                <span>Scan Struk</span>
+              </button>
 
               <button 
                 onClick={() => { setEditingTx(null); setIsModalOpen(true); }}
@@ -739,6 +759,15 @@ export default function Transactions() {
         onDelete={handleDeleteTransaction}
         type={editingTx?.type || activeTab} 
         initialData={editingTx}
+      />
+
+      <ReceiptScanModal
+        isOpen={isScanModalOpen}
+        onClose={() => setIsScanModalOpen(false)}
+        onAddTransaction={handleAddTransaction}
+        accounts={accounts}
+        categories={categories}
+        purposes={purposes}
       />
     </div>
   );
