@@ -807,12 +807,12 @@ export default function ReceiptScanModal({
         items={
           pickerMode === 'from' ? accounts :
           pickerMode === 'category' ? categories :
-          // Filter purposes dynamically based on the specific item's selected category
+          // Filter purposes dynamically: show global purposes or those matching the item's selected category
           purposes.filter(
             p => {
               if (activeItemIndex !== null) {
                 const itemCatId = localItems[activeItemIndex]?.category_id;
-                return !itemCatId || p.category_id === itemCatId;
+                return !p.category_id || !itemCatId || p.category_id === itemCatId;
               }
               return true;
             }
