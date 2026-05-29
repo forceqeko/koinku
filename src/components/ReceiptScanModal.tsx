@@ -218,7 +218,7 @@ export default function ReceiptScanModal({
         setFromAccountId(accounts[0].id);
       }
     }
-  }, [isOpen, accounts]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
