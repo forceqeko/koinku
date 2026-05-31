@@ -77,6 +77,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           .eq('user_id', user.id)
           .is('deleted_at', null)
           .order('date', { ascending: false })
+          .order('created_at', { ascending: false })
       ]);
       
       const rawAccounts = acc.data || [];

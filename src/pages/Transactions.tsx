@@ -157,12 +157,21 @@ export default function Transactions() {
     return [...searchedData].sort((a, b) => {
       let aVal: string | number;
       let bVal: string | number;
-
       switch (sortConfig.key) {
-        case 'date':
-          aVal = new Date(a.date).getTime();
-          bVal = new Date(b.date).getTime();
+        case 'date': {
+          const timeA = new Date(a.date).getTime();
+          const timeB = new Date(b.date).getTime();
+          if (timeA === timeB) {
+            const createA = a.created_at ? new Date(a.created_at).getTime() : 0;
+            const createB = b.created_at ? new Date(b.created_at).getTime() : 0;
+            if (createA < createB) return sortConfig.direction === 'asc' ? -1 : 1;
+            if (createA > createB) return sortConfig.direction === 'asc' ? 1 : -1;
+            return 0;
+          }
+          aVal = timeA;
+          bVal = timeB;
           break;
+        }
         case 'description': {
           const wishlistA = wishlists.find((w: Wishlist) => w.id === a.wishlist_id);
           const wishlistB = wishlists.find((w: Wishlist) => w.id === b.wishlist_id);

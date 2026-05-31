@@ -7,7 +7,7 @@ import { useData } from '../context/DataContext';
 import { supabase } from '../lib/supabase';
 import { toast } from './Toast';
 import clsx from 'clsx';
-import { Plus } from 'lucide-react';
+import { Plus } from '@phosphor-icons/react';
 
 export default function Layout() {
   const [quickAddOpen, setQuickAddOpen] = useState(false);
@@ -53,14 +53,14 @@ export default function Layout() {
 
       {/* Mobile Bottom Navigation */}
       <nav className="md:hidden fixed bottom-0 inset-x-0 bg-surface border-t border-line z-50 flex items-center justify-between px-4 h-16 shadow-[0_-4px_12px_rgba(0,0,0,0.02)] pb-[env(safe-area-inset-bottom)]" aria-label="Navigasi utama">
-        {navItems.slice(0, 2).map(item => {
+        {navItems.filter(item => item.path === '/' || item.path === '/transactions').map(item => {
            const Icon = item.icon;
            return (
              <NavLink key={item.name} to={item.path} end={item.path === '/'} aria-label={item.name} className={({ isActive }) => clsx("flex flex-col items-center justify-center w-14 h-full gap-1 transition-colors relative", isActive ? "text-accent" : "text-text-muted hover:text-text-secondary")}>
                {({ isActive }) => (
                  <>
                    {isActive && <div className="absolute top-0 inset-x-0 h-[2px] bg-accent rounded-b-full"></div>}
-                   <Icon className={clsx("w-5 h-5", isActive && "fill-accent-muted")} />
+                   <Icon size={20} weight={isActive ? "duotone" : "regular"} />
                    <span className="text-[10px] font-medium">{item.name}</span>
                  </>
                )}
@@ -74,18 +74,18 @@ export default function Layout() {
             aria-label="Tambah transaksi baru"
             className="w-[52px] h-[52px] bg-accent hover:bg-accent-hover text-bg rounded-full shadow-lg shadow-accent/20 dark:shadow-none flex items-center justify-center active:scale-95 transition-transform border-[3px] border-surface"
           >
-            <Plus className="w-6 h-6" />
+            <Plus size={24} weight="bold" />
           </button>
         </div>
 
-        {navItems.slice(2, 4).map(item => {
+        {navItems.filter(item => item.path === '/report' || item.path === '/settings').map(item => {
            const Icon = item.icon;
            return (
              <NavLink key={item.name} to={item.path} end={item.path === '/'} aria-label={item.name} className={({ isActive }) => clsx("flex flex-col items-center justify-center w-14 h-full gap-1 transition-colors relative", isActive ? "text-accent" : "text-text-muted hover:text-text-secondary")}>
                {({ isActive }) => (
                  <>
                    {isActive && <div className="absolute top-0 inset-x-0 h-[2px] bg-accent rounded-b-full"></div>}
-                   <Icon className={clsx("w-5 h-5", isActive && "fill-accent-muted")} />
+                   <Icon size={20} weight={isActive ? "duotone" : "regular"} />
                    <span className="text-[10px] font-medium">{item.name}</span>
                  </>
                )}

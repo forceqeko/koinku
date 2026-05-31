@@ -8,6 +8,10 @@ export default function Topbar() {
       case '/': return 'Dashboard';
       case '/transactions': return 'Riwayat Transaksi';
       case '/report': return 'Laporan Finansial';
+      case '/wallet': return 'Wallet';
+      case '/tabungan': return 'Tabungan';
+      case '/investment': return 'Investasi';
+      case '/hutang': return 'Hutang';
       case '/settings': return 'Pengaturan';
       default: return 'Koin Ku';
     }

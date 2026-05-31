@@ -6,6 +6,10 @@ import Dashboard from './pages/Dashboard';
 import Transactions from './pages/Transactions';
 import Report from './pages/Report';
 import Settings from './pages/Settings';
+import WalletPage from './pages/WalletPage';
+import TabunganPage from './pages/TabunganPage';
+import InvestmentPage from './pages/InvestmentPage';
+import HutangPage from './pages/HutangPage';
 import ToastContainer from './components/Toast';
 import { useAuth } from './context/AuthContext';
 
@@ -31,6 +35,10 @@ function App() {
           <Route index element={<Dashboard />} />
           <Route path="transactions" element={<Transactions />} />
           <Route path="report" element={<Report />} />
+          <Route path="wallet" element={<WalletPage />} />
+          <Route path="tabungan" element={<TabunganPage />} />
+          <Route path="investment" element={<InvestmentPage />} />
+          <Route path="hutang" element={<HutangPage />} />
           <Route path="settings" element={<Settings />} />
         </Route>
       </Routes>

@@ -1,12 +1,26 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, ArrowRightLeft, BarChart2, Settings, Plus } from 'lucide-react';
+import { 
+  House, 
+  ArrowsLeftRight, 
+  ChartBar, 
+  Wallet, 
+  PiggyBank, 
+  Briefcase, 
+  HandCoins, 
+  Gear, 
+  Plus 
+} from '@phosphor-icons/react';
 import clsx from 'clsx';
 
 export const navItems = [
-  { name: 'Dashboard', path: '/', icon: LayoutDashboard },
-  { name: 'Transaksi', path: '/transactions', icon: ArrowRightLeft },
-  { name: 'Laporan', path: '/report', icon: BarChart2 },
-  { name: 'Pengaturan', path: '/settings', icon: Settings },
+  { name: 'Dashboard', path: '/', icon: House },
+  { name: 'Transaksi', path: '/transactions', icon: ArrowsLeftRight },
+  { name: 'Laporan', path: '/report', icon: ChartBar },
+  { name: 'Wallet', path: '/wallet', icon: Wallet },
+  { name: 'Tabungan', path: '/tabungan', icon: PiggyBank },
+  { name: 'Investasi', path: '/investment', icon: Briefcase },
+  { name: 'Hutang', path: '/hutang', icon: HandCoins },
+  { name: 'Pengaturan', path: '/settings', icon: Gear },
 ];
 
 interface SidebarProps {
@@ -62,8 +76,12 @@ export default function Sidebar({ onQuickAdd }: SidebarProps) {
                 color: isActive ? 'var(--color-sidebar-active-fg)' : 'var(--color-sidebar-muted)',
               })}
             >
-              <Icon className="w-4 h-4" />
-              {item.name}
+              {({ isActive }) => (
+                <>
+                  <Icon size={18} weight={isActive ? "duotone" : "regular"} className="shrink-0" />
+                  {item.name}
+                </>
+              )}
             </NavLink>
           );
         })}
@@ -81,7 +99,7 @@ export default function Sidebar({ onQuickAdd }: SidebarProps) {
               color: 'var(--color-sidebar-active-fg)',
             }}
           >
-            <Plus className="w-4 h-4" />
+            <Plus size={16} weight="bold" />
             Tambah Transaksi
           </button>
         </div>
