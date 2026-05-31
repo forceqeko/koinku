@@ -70,6 +70,44 @@ export interface Wishlist extends BaseEntity {
 }
 
 // ============================================
+// INVESTMENT PORTFOLIO ENTITY
+// ============================================
+
+export interface InvestmentPortfolio extends BaseEntity {
+  name: string;
+  instrument_type: string;
+  initial_capital: number;
+  current_value: number;
+  notes?: string | null;
+  is_active: boolean;
+}
+
+// ============================================
+// INVESTMENT PORTFOLIO WISHLIST JUNCTION ENTITY
+// ============================================
+
+export interface InvestmentPortfolioWishlist {
+  id: string;
+  portfolio_id: string;
+  wishlist_id: string;
+  created_at?: string;
+}
+
+// ============================================
+// INVESTMENT RETURN ENTITY
+// ============================================
+
+export interface InvestmentReturn {
+  id: string;
+  user_id: string;
+  portfolio_id: string;
+  date: string;
+  value_at_date: number;
+  notes?: string | null;
+  created_at?: string;
+}
+
+// ============================================
 // BILL PURPOSE ENTITY (for recurring bills/tagihan)
 // ============================================
 
@@ -133,6 +171,9 @@ export interface DataState {
   sources: IncomeSource[];
   wishlists: Wishlist[];
   transactions: Transaction[];
+  portfolios: InvestmentPortfolio[];
+  portfolioWishlists: InvestmentPortfolioWishlist[];
+  investmentReturns: InvestmentReturn[];
 }
 
 // ============================================
@@ -250,6 +291,9 @@ export const TableNames = {
   INCOME_SOURCES: 'income_sources' as const,
   WISHLISTS: 'wishlists' as const,
   BILL_PURPOSES: 'bill_purposes' as const,
+  INVESTMENT_PORTFOLIOS: 'investment_portfolios' as const,
+  INVESTMENT_PORTFOLIO_WISHLISTS: 'investment_portfolio_wishlists' as const,
+  INVESTMENT_RETURNS: 'investment_returns' as const,
 } as const;
 
 export type TableName = typeof TableNames[keyof typeof TableNames];

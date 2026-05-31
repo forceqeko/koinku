@@ -9,7 +9,6 @@ import { toast } from '../components/Toast';
 import { supabase } from '../lib/supabase';
 import { useState, useEffect, useRef } from 'react';
 import { fmt } from '../lib/utils';
-import ThemeDropdown from '../components/ThemeDropdown';
 
 export default function Dashboard() {
   const { accounts, wishlists, transactions, refresh } = useData();
@@ -126,21 +125,20 @@ export default function Dashboard() {
       <div className="header-hero">
         <div className="max-w-[1100px] mx-auto">
           {/* Top Header inside Hero */}
-          <div className="flex justify-between items-center mb-6">
+          <div className="flex items-center justify-start mb-6">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-white/20 dark:bg-surface flex items-center justify-center font-bold text-lg overflow-hidden border border-white/30 dark:border-line backdrop-blur-md">
-                {(user?.user_metadata?.name || user?.user_metadata?.full_name || user?.email || 'U').charAt(0).toUpperCase()}
+              <div className="w-10 h-10 rounded-full bg-white/20 dark:bg-surface flex items-center justify-center font-bold text-lg overflow-hidden border border-white/30 dark:border-line backdrop-blur-md shrink-0">
+                {user?.user_metadata?.show_avatar !== false && user?.user_metadata?.avatar_url ? (
+                  <img src={user.user_metadata.avatar_url} alt="Profile" className="w-full h-full object-cover" />
+                ) : (
+                  (user?.user_metadata?.name || user?.user_metadata?.full_name || user?.email || 'U').charAt(0).toUpperCase()
+                )}
               </div>
               <div>
                 <p className="text-sm text-bg/80 dark:text-text-muted">Selamat Datang! 👋</p>
                 <p className="font-semibold text-base">{user?.user_metadata?.name || user?.user_metadata?.full_name || user?.email?.split('@')[0]}</p>
               </div>
             </div>
-            <ThemeDropdown
-              className="shrink-0"
-              iconOnly
-              buttonClassName="bg-white/10 dark:bg-surface/80 border-white/15 dark:border-line hover:bg-white/15 dark:hover:bg-surface [color:inherit] [&_.theme-dropdown-icon]:bg-white/20 [&_.theme-dropdown-icon]:text-[var(--primary-foreground)] dark:[&_.theme-dropdown-icon]:bg-accent/10 dark:[&_.theme-dropdown-icon]:text-accent"
-            />
           </div>
 
           {/* Main Balance */}

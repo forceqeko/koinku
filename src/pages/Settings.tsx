@@ -5,8 +5,10 @@ import { supabase } from '../lib/supabase';
 import { Plus, ChevronRight, LogOut, ArrowUpDown, ChevronUp, ChevronDown, Check } from 'lucide-react';
 import clsx from 'clsx';
 import SettingsModal from '../components/SettingsModal';
+import EditProfileModal from '../components/EditProfileModal';
 import { toast } from '../components/Toast';
 import { fmt } from '../lib/utils';
+import ThemeDropdown from '../components/ThemeDropdown';
 
 type SettingTab = 'akun' | 'sumber' | 'kategori' | 'tujuan' | 'wishlist' | 'tagihan';
 
@@ -145,6 +147,7 @@ function Item({
 export default function Settings() {
   const [activeTab, setActiveTab] = useState<SettingTab>('akun');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
   const [isReordering, setIsReordering] = useState(false);
   const [editingItem, setEditingItem] = useState<any>(null);
   
@@ -315,18 +318,26 @@ export default function Settings() {
   return (
     <div className="pb-8">
       {/* Profil Singkat Edge-to-Edge */}
-      <div className="bg-surface border-b border-line px-5 py-6 mb-2 flex items-center gap-4 md:rounded-b-3xl shadow-sm md:mx-6 md:border-x">
-        <div className="w-14 h-14 rounded-full bg-accent/10 border-2 border-accent/20 flex items-center justify-center font-bold text-2xl text-accent overflow-hidden shadow-inner">
-           {user?.user_metadata?.avatar_url ? (
-             <img src={user.user_metadata.avatar_url} alt="Profile" className="w-full h-full object-cover" />
-           ) : (
-             (user?.user_metadata?.name || user?.user_metadata?.full_name || user?.email || 'U').charAt(0).toUpperCase()
-           )}
+      <div className="bg-surface border-b border-line px-5 py-6 mb-2 flex items-center justify-between gap-4 md:rounded-b-3xl shadow-sm md:mx-6 md:border-x">
+        <div className="flex items-center gap-4 min-w-0">
+          <div className="w-14 h-14 rounded-full bg-accent/10 border-2 border-accent/20 flex items-center justify-center font-bold text-2xl text-accent overflow-hidden shadow-inner shrink-0">
+             {user?.user_metadata?.show_avatar !== false && user?.user_metadata?.avatar_url ? (
+               <img src={user.user_metadata.avatar_url} alt="Profile" className="w-full h-full object-cover" />
+             ) : (
+               (user?.user_metadata?.name || user?.user_metadata?.full_name || user?.email || 'U').charAt(0).toUpperCase()
+             )}
+          </div>
+          <div className="min-w-0 flex-1">
+             <h2 className="text-lg font-bold text-text-primary tracking-tight truncate">{user?.user_metadata?.name || user?.user_metadata?.full_name || user?.email?.split('@')[0]}</h2>
+             <p className="text-[13px] text-text-muted bg-surface-alt px-2 py-0.5 rounded-full inline-flex font-medium mt-1 truncate max-w-full">{user?.email}</p>
+          </div>
         </div>
-        <div>
-           <h2 className="text-lg font-bold text-text-primary tracking-tight">{user?.user_metadata?.name || user?.user_metadata?.full_name || user?.email?.split('@')[0]}</h2>
-           <p className="text-[13px] text-text-muted bg-surface-alt px-2 py-0.5 rounded-full inline-flex font-medium mt-1">{user?.email}</p>
-        </div>
+        <button
+          onClick={() => setIsEditProfileOpen(true)}
+          className="px-4 py-2 bg-surface hover:bg-surface-hover border border-line hover:border-accent/30 text-text-primary hover:text-accent font-bold text-[12px] rounded-xl transition-all shadow-sm flex items-center gap-1.5 shrink-0 active:scale-95"
+        >
+          ✏️ Edit Profil
+        </button>
       </div>
 
       {/* Modern Tabs */}
@@ -435,8 +446,17 @@ export default function Settings() {
         )}
       </div>
 
+      {/* Tema Card */}
+      <div className="bg-surface border-y border-line md:border-x md:rounded-2xl md:mx-6 md:mt-6 mt-4 mb-4 p-5 flex flex-row items-center justify-between gap-4">
+        <div className="min-w-0 flex-1">
+          <h3 className="text-[14px] font-bold text-text-primary tracking-tight">Tema Tampilan Aplikasi</h3>
+          <p className="text-[11px] sm:text-[12px] text-text-muted mt-0.5 leading-tight">Pilih skema warna yang paling sesuai dengan preferensi visual Anda.</p>
+        </div>
+        <ThemeDropdown className="shrink-0" menuAlign="right" />
+      </div>
+
       {/* Huge Action Bottom */}
-      <div className="px-4 md:px-6 mt-12 mb-8">
+      <div className="px-4 md:px-6 mt-6 mb-8">
          <button onClick={logout} className="w-full bg-danger/10 hover:bg-danger/20 text-danger border border-danger/20 hover:border-danger/40 transition-colors rounded-2xl py-4 flex items-center justify-center gap-2 font-bold text-[15px] active:scale-[0.98]">
             <LogOut className="w-5 h-5" />
             Keluar Dari Akun
@@ -451,6 +471,12 @@ export default function Settings() {
         onSave={handleSave} 
         onDelete={handleDelete}
         initialData={editingItem}
+      />
+
+      {/* Edit Profile Modal */}
+      <EditProfileModal
+        isOpen={isEditProfileOpen}
+        onClose={() => setIsEditProfileOpen(false)}
       />
     </div>
   );

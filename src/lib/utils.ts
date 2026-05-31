@@ -1,10 +1,12 @@
 // ── Currency Formatter ──
-export const fmt = (n: number) =>
-  new Intl.NumberFormat('id-ID', {
+export const fmt = (n: number | string | null | undefined) => {
+  const val = typeof n === 'string' ? Number(n) : (n ?? 0);
+  return new Intl.NumberFormat('id-ID', {
     style: 'currency',
     currency: 'IDR',
     minimumFractionDigits: 0,
-  }).format(n);
+  }).format(isNaN(val) ? 0 : val);
+};
 
 // ── Format number input with thousand separator ──
 export const formatThousands = (value: string): string => {

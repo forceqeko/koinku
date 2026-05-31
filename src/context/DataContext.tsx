@@ -8,7 +8,10 @@ import type {
   IncomeSource,
   Wishlist,
   Transaction,
-  BillPurpose
+  BillPurpose,
+  InvestmentPortfolio,
+  InvestmentPortfolioWishlist,
+  InvestmentReturn
 } from '../types';
 
 export interface DataContextType {
@@ -19,6 +22,9 @@ export interface DataContextType {
   wishlists: Wishlist[];
   billPurposes: BillPurpose[];
   transactions: Transaction[];
+  portfolios: InvestmentPortfolio[];
+  portfolioWishlists: InvestmentPortfolioWishlist[];
+  investmentReturns: InvestmentReturn[];
   loading: boolean;
   refresh: () => Promise<void>;
 }
@@ -35,6 +41,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
     wishlists: Wishlist[];
     billPurposes: BillPurpose[];
     transactions: Transaction[];
+    portfolios: InvestmentPortfolio[];
+    portfolioWishlists: InvestmentPortfolioWishlist[];
+    investmentReturns: InvestmentReturn[];
   }>({
     accounts: [],
     categories: [],
@@ -42,7 +51,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
     sources: [],
     wishlists: [],
     billPurposes: [],
-    transactions: []
+    transactions: [],
+    portfolios: [],
+    portfolioWishlists: [],
+    investmentReturns: []
   });
   const [loading, setLoading] = useState(true);
 
@@ -51,6 +63,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     
     try {
+      // Fetch core financial tables
       const [acc, cat, pur, src, wsh, bill, txn] = await Promise.all([
         supabase.from('accounts').select('*').eq('user_id', user.id).order('created_at'),
         supabase.from('expense_categories').select('*').eq('user_id', user.id).order('created_at'),
@@ -85,6 +98,39 @@ export function DataProvider({ children }: { children: ReactNode }) {
         }
       }
 
+      // Fetch investment tables with error tolerance in case database schema is not updated yet
+      let portfoliosData: InvestmentPortfolio[] = [];
+      let portfolioWishlistsData: InvestmentPortfolioWishlist[] = [];
+      let investmentReturnsData: InvestmentReturn[] = [];
+
+      try {
+        const [port, portWsh, invRet] = await Promise.all([
+          supabase.from('investment_portfolios').select('*').eq('user_id', user.id).order('created_at'),
+          supabase.from('investment_portfolio_wishlists').select('*'),
+          supabase.from('investment_returns').select('*').eq('user_id', user.id).order('date', { ascending: true })
+        ]);
+        
+        if (!port.error) {
+          portfoliosData = port.data || [];
+        } else {
+          console.warn('investment_portfolios fetch error: table might not exist yet.', port.error);
+        }
+        
+        if (!portWsh.error) {
+          portfolioWishlistsData = portWsh.data || [];
+        } else {
+          console.warn('investment_portfolio_wishlists fetch error: table might not exist yet.', portWsh.error);
+        }
+        
+        if (!invRet.error) {
+          investmentReturnsData = invRet.data || [];
+        } else {
+          console.warn('investment_returns fetch error: table might not exist yet.', invRet.error);
+        }
+      } catch (err) {
+        console.error('Failed to load investment tables. They might not exist yet.', err);
+      }
+
       setData({
         accounts: sortedAccounts,
         categories: cat.data || [],
@@ -92,7 +138,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
         sources: src.data || [],
         wishlists: wsh.data || [],
         billPurposes: bill.data || [],
-        transactions: txn.data || []
+        transactions: txn.data || [],
+        portfolios: portfoliosData,
+        portfolioWishlists: portfolioWishlistsData,
+        investmentReturns: investmentReturnsData
       });
     } catch (err) {
       console.error('Failed to load data', err);
@@ -105,7 +154,18 @@ export function DataProvider({ children }: { children: ReactNode }) {
     if (user) {
       refresh();
     } else {
-      setData({ accounts: [], categories: [], purposes: [], sources: [], wishlists: [], billPurposes: [], transactions: [] });
+      setData({
+        accounts: [],
+        categories: [],
+        purposes: [],
+        sources: [],
+        wishlists: [],
+        billPurposes: [],
+        transactions: [],
+        portfolios: [],
+        portfolioWishlists: [],
+        investmentReturns: []
+      });
       setLoading(false);
     }
   }, [user]);
