@@ -477,10 +477,14 @@ export default function Report() {
   const heatTier = (amount: number | null): 0 | 1 | 2 | 3 | 4 | -1 => {
     if (amount === null) return -1;
     if (amount === 0) return 0;
-    const ratio = heatmapDailySpending.maxAmount > 0 ? amount / heatmapDailySpending.maxAmount : 0;
-    if (ratio < 0.25) return 1;
-    if (ratio < 0.5) return 2;
-    if (ratio < 0.75) return 3;
+
+    const low = Number(localStorage.getItem('heat_low') || 50000);
+    const medium = Number(localStorage.getItem('heat_medium') || 150000);
+    const high = Number(localStorage.getItem('heat_high') || 300000);
+
+    if (amount <= low) return 1;
+    if (amount <= medium) return 2;
+    if (amount <= high) return 3;
     return 4;
   };
 
@@ -1247,7 +1251,7 @@ export default function Report() {
                       <span className="text-[12px] font-bold text-success">{fmt(cashFlow.totalIncome)}</span>
                     </div>
                     <div className="h-2.5 bg-surface-alt rounded-full overflow-hidden">
-                      <div className="h-full bg-success rounded-full" style={{ width: '100%' }} />
+                      <div className="h-full rounded-full" style={{ width: '100%', backgroundColor: 'var(--color-success)' }} />
                     </div>
                   </div>
                 </div>
@@ -1268,7 +1272,7 @@ export default function Report() {
                         </span>
                       </div>
                       <div className="h-1.5 bg-surface-alt rounded-full overflow-hidden">
-                        <div className="h-full bg-danger rounded-full" style={{ width: `${Math.min(cashFlow.expensePercent, 100)}%` }} />
+                        <div className="h-full rounded-full" style={{ width: `${Math.min(cashFlow.expensePercent, 100)}%`, backgroundColor: 'var(--color-danger)' }} />
                       </div>
                     </div>
                   </div>
@@ -1288,7 +1292,7 @@ export default function Report() {
                           </span>
                         </div>
                         <div className="h-1.5 bg-surface-alt rounded-full overflow-hidden">
-                          <div className="h-full bg-accent rounded-full" style={{ width: `${Math.min(cashFlow.savingPercent, 100)}%` }} />
+                          <div className="h-full rounded-full" style={{ width: `${Math.min(cashFlow.savingPercent, 100)}%`, backgroundColor: 'var(--color-accent)' }} />
                         </div>
                       </div>
                     </div>
@@ -1317,11 +1321,11 @@ export default function Report() {
                       </div>
                       <div className="h-1.5 bg-surface-alt rounded-full overflow-hidden">
                         <div
-                          className={clsx(
-                            "h-full rounded-full",
-                            cashFlow.remaining >= 0 ? "bg-success/60" : "bg-danger/70"
-                          )}
-                          style={{ width: `${Math.min(cashFlow.netFlowPercent, 100)}%` }}
+                          className="h-full rounded-full"
+                          style={{
+                            width: `${Math.min(cashFlow.netFlowPercent, 100)}%`,
+                            backgroundColor: cashFlow.remaining >= 0 ? 'var(--color-success)' : 'var(--color-danger)'
+                          }}
                         />
                       </div>
                     </div>

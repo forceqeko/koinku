@@ -7,7 +7,9 @@ import {
   Plus, 
   Gear, 
   ClockCounterClockwise, 
-  Stack 
+  Stack,
+  Eye,
+  EyeSlash
 } from '@phosphor-icons/react';
 import clsx from 'clsx';
 import { useData } from '../context/DataContext';
@@ -29,6 +31,16 @@ export default function InvestmentPage() {
   const [isInvestmentModalOpen, setIsInvestmentModalOpen] = useState(false);
   const [investmentModalMode, setInvestmentModalMode] = useState<'add' | 'update_value' | 'history' | 'edit'>('add');
   const [selectedPortfolio, setSelectedPortfolio] = useState<any>(null);
+  const [showBalance, setShowBalance] = useState(() => {
+    const saved = localStorage.getItem('showBalance');
+    return saved !== null ? JSON.parse(saved) : true;
+  });
+
+  const toggleBalance = () => {
+    const newValue = !showBalance;
+    setShowBalance(newValue);
+    localStorage.setItem('showBalance', JSON.stringify(newValue));
+  };
 
   // ── Portofolio & Return Calculations ──
   const getEffectiveCapital = (p: any) => {
@@ -120,64 +132,64 @@ export default function InvestmentPage() {
 
   return (
     <div className="p-4 md:p-6 pb-24 md:pb-6 space-y-6">
-      {/* KPI Cards Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-surface card p-5 md:p-6 shadow-sm border border-line">
-        {/* KPI 1: Total Capital */}
-        <div className="text-center md:text-left md:border-r border-line last:border-0 md:px-4 min-w-0 flex flex-col justify-between py-2">
-          <div>
-            <p className="text-[10px] text-text-muted font-bold uppercase tracking-wider mb-1">Total Modal</p>
-            <p className="text-[16px] md:text-[18px] font-extrabold text-text-primary truncate">{fmt(totalCapital)}</p>
+      {/* Premium Investment Summary Card */}
+      <div className="card p-6 border-line bg-surface shadow-sm relative overflow-hidden">
+        {/* Decorative background shapes */}
+        <div className="absolute right-0 top-0 w-32 h-32 bg-accent/5 rounded-full blur-2xl -mr-8 -mt-8"></div>
+        <div className="absolute left-1/4 bottom-0 w-24 h-24 bg-accent/5 rounded-full blur-xl -mb-6"></div>
+        
+        <div className="relative z-10 space-y-5">
+          {/* Top Row: Label and Toggle Balance */}
+          <div className="flex justify-between items-center">
+            <span className="text-[10px] md:text-[11px] font-bold tracking-wider text-text-muted uppercase">Total Nilai Pasar Investasi</span>
+            <button
+              onClick={toggleBalance}
+              className="p-1.5 rounded-full bg-surface-alt/50 hover:bg-surface-alt transition-all"
+              aria-label={showBalance ? "Sembunyikan saldo" : "Tampilkan saldo"}
+            >
+              {showBalance ? <EyeSlash size={16} className="text-text-muted" /> : <Eye size={16} className="text-text-muted" />}
+            </button>
           </div>
-          <div className="mt-2 text-[10px] text-text-muted font-semibold bg-surface-alt/40 px-2 py-0.5 rounded-full w-fit mx-auto md:mx-0">
-            {activePortfolios.length} Portofolio
+          
+          {/* Middle Row: Main Large Balance and Return Badge */}
+          <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-3">
+            <div>
+              <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight text-accent">
+                {showBalance ? fmt(totalMarketValue) : '••••••'}
+              </h2>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <span className={clsx(
+                "text-[11px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1",
+                totalReturn >= 0 ? "bg-success/10 text-success" : "bg-danger/10 text-danger"
+              )}>
+                {totalReturn >= 0 ? '▲' : '▼'} {totalReturnPercent.toFixed(2)}%
+              </span>
+              <span className={clsx(
+                "text-[12px] font-extrabold",
+                totalReturn >= 0 ? "text-success" : "text-danger"
+              )}>
+                ({totalReturn >= 0 ? '+' : ''}{showBalance ? fmt(totalReturn) : '••••'})
+              </span>
+            </div>
           </div>
-        </div>
 
-        {/* KPI 2: Market Value */}
-        <div className="text-center md:text-left md:border-r border-line last:border-0 md:px-4 min-w-0 flex flex-col justify-between py-2">
-          <div>
-            <p className="text-[10px] text-text-muted font-bold uppercase tracking-wider mb-1">Nilai Pasar</p>
-            <p className="text-[16px] md:text-[18px] font-extrabold text-accent truncate">{fmt(totalMarketValue)}</p>
+          {/* Bottom Divider */}
+          <div className="border-t border-line/60 pt-4 grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-[9px] font-bold text-text-muted uppercase tracking-wider">Total Modal</p>
+              <p className="text-[14px] font-extrabold text-text-primary mt-0.5">
+                {showBalance ? fmt(totalCapital) : '••••••'}
+              </p>
+            </div>
+            <div>
+              <p className="text-[9px] font-bold text-text-muted uppercase tracking-wider">Jumlah Portofolio</p>
+              <p className="text-[14px] font-extrabold text-text-primary mt-0.5">
+                {activePortfolios.length} Aktif
+              </p>
+            </div>
           </div>
-          <div className="mt-2 text-[10px] text-text-muted font-semibold bg-surface-alt/40 px-2 py-0.5 rounded-full w-fit mx-auto md:mx-0">
-            Aset Terkini
-          </div>
-        </div>
-
-        {/* KPI 3: Total Return */}
-        <div className="text-center md:text-left md:border-r border-line last:border-0 md:px-4 min-w-0 flex flex-col justify-between py-2">
-          <div>
-            <p className="text-[10px] text-text-muted font-bold uppercase tracking-wider mb-1">Total Return</p>
-            <p className={clsx(
-              "text-[16px] md:text-[18px] font-extrabold truncate",
-              totalReturn >= 0 ? "text-success" : "text-danger"
-            )}>
-              {totalReturn >= 0 ? '+' : ''}{fmt(totalReturn)}
-            </p>
-          </div>
-          <div className="mt-2">
-            <span className={clsx(
-              "text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap",
-              totalReturn >= 0 ? "bg-success/10 text-success" : "bg-danger/10 text-danger"
-            )}>
-              {totalReturn >= 0 ? '▲' : '▼'} {totalReturnPercent.toFixed(2)}%
-            </span>
-          </div>
-        </div>
-
-        {/* KPI 4: Add Button */}
-        <div className="text-center md:text-left md:px-4 min-w-0 flex flex-col justify-center items-center md:items-start py-2">
-          <button
-            onClick={() => {
-              setSelectedPortfolio(null);
-              setInvestmentModalMode('add');
-              setIsInvestmentModalOpen(true);
-            }}
-            className="w-full py-3 bg-accent hover:bg-accent-dark text-white rounded-2xl text-[12px] font-extrabold shadow-md shadow-accent/20 transition-all flex items-center justify-center gap-1.5"
-          >
-            <Plus size={16} weight="bold" />
-            <span>Portofolio Baru</span>
-          </button>
         </div>
       </div>
 
@@ -210,10 +222,21 @@ export default function InvestmentPage() {
           {/* Portfolio Grid List */}
           <div className="space-y-3">
             <div className="flex justify-between items-center px-1">
-              <h3 className="text-[13px] font-bold text-text-primary uppercase tracking-wider">Aset Investasi Anda</h3>
-              <span className="text-[10px] text-text-muted font-medium bg-surface px-2.5 py-0.5 rounded-full border border-line">
-                {activePortfolios.length} Aktif
-              </span>
+              <h3 className="text-[13px] font-bold text-text-primary uppercase tracking-wider flex items-center gap-1.5">
+                <Briefcase size={16} weight="duotone" className="text-accent" />
+                <span>Aset Investasi Anda</span>
+              </h3>
+              <button
+                onClick={() => {
+                  setSelectedPortfolio(null);
+                  setInvestmentModalMode('add');
+                  setIsInvestmentModalOpen(true);
+                }}
+                className="px-3.5 py-1.5 bg-accent hover:bg-accent-dark text-white rounded-xl text-[11px] font-bold shadow-sm shadow-accent/15 transition-all flex items-center gap-1"
+              >
+                <Plus size={14} weight="bold" />
+                <span>Portofolio Baru</span>
+              </button>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -248,11 +271,11 @@ export default function InvestmentPage() {
                     <div className="grid grid-cols-2 gap-2 my-4 bg-surface-alt/10 border border-line/45 p-3 rounded-2xl text-[11px]">
                       <div>
                         <p className="text-text-muted text-[9px] font-bold uppercase">Modal</p>
-                        <p className="font-extrabold text-text-primary truncate">{fmt(capital)}</p>
+                        <p className="font-extrabold text-text-primary truncate">{showBalance ? fmt(capital) : '••••••'}</p>
                       </div>
                       <div className="text-right">
                         <p className="text-text-muted text-[9px] font-bold uppercase">Nilai Kini</p>
-                        <p className="font-extrabold text-accent truncate">{fmt(currentVal)}</p>
+                        <p className="font-extrabold text-accent truncate">{showBalance ? fmt(currentVal) : '••••••'}</p>
                       </div>
                     </div>
 
@@ -398,7 +421,7 @@ export default function InvestmentPage() {
                       <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ marginBottom: 12 }}>
                         <div className="text-center">
                           <p className="text-[8px] text-text-muted">Total Aset</p>
-                          <p className="text-[11px] font-bold text-text-primary truncate max-w-[85px]">{fmt(totalMarketValue)}</p>
+                          <p className="text-[11px] font-bold text-text-primary truncate max-w-[85px]">{showBalance ? fmt(totalMarketValue) : '••••••'}</p>
                         </div>
                       </div>
                     </>

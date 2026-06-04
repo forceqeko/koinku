@@ -516,6 +516,52 @@ export default function InvestmentModal({ isOpen, onClose, mode: initialMode, po
     return list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [portfolio, portfolioWishlists, transactions, wishlists, investmentReturns, currentPortfolioEffectiveCapital]);
 
+  // Compute historical effective capital at a given date for accurate return calculations.
+  // We do NOT use capitalHistory here because it double-counts for linked portfolios:
+  // its "Modal Awal" entry already includes pre-creation savings, and those same savings
+  // are also listed as individual entries.
+  const getCapitalAtDate = useMemo(() => {
+    if (!portfolio) return (_date: string) => currentPortfolioEffectiveCapital;
+
+    const linkedWishlistIds = (portfolioWishlists || [])
+      .filter(pw => pw && pw.portfolio_id === portfolio.id)
+      .map(pw => pw.wishlist_id);
+
+    const isLinked = linkedWishlistIds.length > 0;
+
+    if (isLinked) {
+      // For linked portfolios: capital at any date = sum of all saving transactions
+      // to the linked wishlists on or before that date.
+      const savingTxs = (transactions || [])
+        .filter(t => t.type === 'saving' && t.wishlist_id && linkedWishlistIds.includes(t.wishlist_id) && !t.deleted_at)
+        .map(t => ({ date: t.date, amount: Number(t.amount || 0) }));
+
+      return (date: string) => {
+        const total = savingTxs
+          .filter(t => t.date <= date)
+          .reduce((sum, t) => sum + t.amount, 0);
+        // Fallback to currentPortfolioEffectiveCapital if no savings found (edge case)
+        return total > 0 ? total : currentPortfolioEffectiveCapital;
+      };
+    } else {
+      // For manual portfolios: capital at any date = initial_capital + TOPUP entries on or before that date.
+      const topUps = (investmentReturns || [])
+        .filter(r => r && r.portfolio_id === portfolio.id && typeof r.notes === 'string' && r.notes.startsWith('[TOPUP:'))
+        .map(r => {
+          const match = r.notes?.match(/^\[TOPUP:(\d+)\]/);
+          return { date: r.date, amount: match ? Number(match[1]) : 0 };
+        });
+
+      const base = portfolio.initial_capital ?? 0;
+      return (date: string) => {
+        const topUpTotal = topUps
+          .filter(t => t.date <= date)
+          .reduce((sum, t) => sum + t.amount, 0);
+        return base + topUpTotal;
+      };
+    }
+  }, [portfolio, portfolioWishlists, transactions, investmentReturns, currentPortfolioEffectiveCapital]);
+
   if (!isOpen) return null;
 
   return createPortal(
@@ -1054,8 +1100,9 @@ export default function InvestmentModal({ isOpen, onClose, mode: initialMode, po
                   ) : (
                     <div className="max-h-[300px] overflow-y-auto custom-scrollbar divide-y divide-line">
                       {currentReturns.map((item, idx) => {
-                        const netNominal = item.value_at_date - currentPortfolioEffectiveCapital;
-                        const netPercent = currentPortfolioEffectiveCapital > 0 ? (netNominal / currentPortfolioEffectiveCapital) * 100 : 0;
+                        const capitalAtDate = getCapitalAtDate(item.date);
+                        const netNominal = item.value_at_date - capitalAtDate;
+                        const netPercent = capitalAtDate > 0 ? (netNominal / capitalAtDate) * 100 : 0;
                         const isInitial = idx === currentReturns.length - 1; // last item is the initial log
 
                         return (

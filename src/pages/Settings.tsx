@@ -2,10 +2,11 @@ import { useState } from 'react';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
-import { Plus, ChevronRight, LogOut, ArrowUpDown, ChevronUp, ChevronDown, Check } from 'lucide-react';
+import { Plus, ChevronRight, LogOut, ArrowUpDown, ChevronUp, ChevronDown, Check, Sliders } from 'lucide-react';
 import clsx from 'clsx';
 import SettingsModal from '../components/SettingsModal';
 import EditProfileModal from '../components/EditProfileModal';
+import AppSettingsModal from '../components/AppSettingsModal';
 import { toast } from '../components/Toast';
 import { fmt } from '../lib/utils';
 import ThemeDropdown from '../components/ThemeDropdown';
@@ -14,10 +15,10 @@ type SettingTab = 'akun' | 'sumber' | 'kategori' | 'tujuan' | 'wishlist' | 'tagi
 
 const tabs: { id: SettingTab; label: string }[] = [
   { id: 'akun', label: 'Akun / Wallet' },
-  { id: 'sumber', label: 'Sumber Penghasilan' },
-  { id: 'kategori', label: 'Kategori Pengeluaran' },
-  { id: 'tujuan', label: 'Tujuan Pengeluaran' },
-  { id: 'wishlist', label: 'Wishlist Tabungan' },
+  { id: 'sumber', label: 'Sumber' },
+  { id: 'kategori', label: 'Kategori' },
+  { id: 'tujuan', label: 'Tujuan' },
+  { id: 'wishlist', label: 'Wishlist' },
   { id: 'tagihan', label: 'Tagihan' },
 ];
 
@@ -148,6 +149,7 @@ export default function Settings() {
   const [activeTab, setActiveTab] = useState<SettingTab>('akun');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
+  const [isAppSettingsOpen, setIsAppSettingsOpen] = useState(false);
   const [isReordering, setIsReordering] = useState(false);
   const [editingItem, setEditingItem] = useState<any>(null);
   
@@ -444,20 +446,23 @@ export default function Settings() {
             {billPurposes.length === 0 && <p className="text-center text-sm font-medium text-text-muted py-8">Belum ada tagihan diatur.</p>}
           </Section>
         )}
-      </div>
 
-      {/* Tema Card */}
-      <div className="bg-surface border-y border-line md:border-x md:rounded-2xl md:mx-6 md:mt-6 mt-4 mb-4 p-5 flex flex-row items-center justify-between gap-4">
-        <div className="min-w-0 flex-1">
-          <h3 className="text-[14px] font-bold text-text-primary tracking-tight">Tema Tampilan Aplikasi</h3>
-          <p className="text-[11px] sm:text-[12px] text-text-muted mt-0.5 leading-tight">Pilih skema warna yang paling sesuai dengan preferensi visual Anda.</p>
-        </div>
-        <ThemeDropdown className="shrink-0" menuAlign="right" />
       </div>
 
       {/* Huge Action Bottom */}
-      <div className="px-4 md:px-6 mt-6 mb-8">
-         <button onClick={logout} className="w-full bg-danger/10 hover:bg-danger/20 text-danger border border-danger/20 hover:border-danger/40 transition-colors rounded-2xl py-4 flex items-center justify-center gap-2 font-bold text-[15px] active:scale-[0.98]">
+      <div className="px-4 md:px-6 mt-6 mb-8 space-y-3">
+         <button 
+           onClick={() => setIsAppSettingsOpen(true)} 
+           className="w-full bg-accent/10 hover:bg-accent/20 text-accent border border-accent/20 hover:border-accent/40 transition-colors rounded-2xl py-4 flex items-center justify-center gap-2 font-bold text-[15px] active:scale-[0.98]"
+         >
+            <Sliders className="w-5 h-5" />
+            Pengaturan Aplikasi
+         </button>
+
+         <button 
+           onClick={logout} 
+           className="w-full bg-danger/10 hover:bg-danger/20 text-danger border border-danger/20 hover:border-danger/40 transition-colors rounded-2xl py-4 flex items-center justify-center gap-2 font-bold text-[15px] active:scale-[0.98]"
+         >
             <LogOut className="w-5 h-5" />
             Keluar Dari Akun
          </button>
@@ -477,6 +482,12 @@ export default function Settings() {
       <EditProfileModal
         isOpen={isEditProfileOpen}
         onClose={() => setIsEditProfileOpen(false)}
+      />
+
+      {/* App Settings Modal */}
+      <AppSettingsModal
+        isOpen={isAppSettingsOpen}
+        onClose={() => setIsAppSettingsOpen(false)}
       />
     </div>
   );
