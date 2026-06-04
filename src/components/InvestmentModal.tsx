@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Check, Trash2, Calendar, TrendingUp, TrendingDown, Info, Tag, BookOpen, ToggleLeft, ToggleRight, Layers, ArrowLeft } from 'lucide-react';
+import { X, Check, Trash2, Calendar, TrendingUp, TrendingDown, Info, Tag, BookOpen, ToggleLeft, ToggleRight, Layers, ArrowLeft, AlertTriangle } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -22,16 +22,16 @@ const formatDateSafe = (dateStr: string | null | undefined) => {
 interface InvestmentModalProps {
   isOpen: boolean;
   onClose: () => void;
-  mode: 'add' | 'update_value' | 'history' | 'edit';
+  mode: 'add' | 'update_value' | 'history' | 'edit' | 'close';
   portfolio?: InvestmentPortfolio | null;
 }
 
 export default function InvestmentModal({ isOpen, onClose, mode: initialMode, portfolio }: InvestmentModalProps) {
   const { user } = useAuth();
-  const { wishlists, portfolioWishlists, investmentReturns, transactions, refresh } = useData();
+  const { wishlists, portfolioWishlists, investmentReturns, transactions, refresh, accounts, categories, purposes, sources } = useData();
 
   // Modal active mode (can switch between history and edit inside the modal)
-  const [activeMode, setActiveMode] = useState<'add' | 'update_value' | 'history' | 'edit'>(initialMode);
+  const [activeMode, setActiveMode] = useState<'add' | 'update_value' | 'history' | 'edit' | 'close'>(initialMode);
 
   // Capital Top-up States for Update Value mode
   const [isTopUp, setIsTopUp] = useState(false);
@@ -58,6 +58,9 @@ export default function InvestmentModal({ isOpen, onClose, mode: initialMode, po
   const [newValueInput, setNewValueInput] = useState('');
   const [updateNotes, setUpdateNotes] = useState('');
 
+  // Liquidation wallet state for Close mode
+  const [selectedLiquidationWalletId, setSelectedLiquidationWalletId] = useState('');
+
   // General states
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -81,6 +84,7 @@ export default function InvestmentModal({ isOpen, onClose, mode: initialMode, po
         setIsTopUp(false);
         setTopUpAmountInput('');
         setHistoryTab('performa');
+        setSelectedLiquidationWalletId('');
       } else if (portfolio) {
         setName(portfolio.name || '');
         setInstrumentType(portfolio.instrument_type || '');
@@ -104,6 +108,7 @@ export default function InvestmentModal({ isOpen, onClose, mode: initialMode, po
         setIsTopUp(false);
         setTopUpAmountInput('');
         setHistoryTab('performa');
+        setSelectedLiquidationWalletId(portfolio.liquidation_account_id || '');
 
         // Find initial return date
         const initialReturn = (investmentReturns || [])
@@ -120,7 +125,7 @@ export default function InvestmentModal({ isOpen, onClose, mode: initialMode, po
   }, [isOpen, initialMode, portfolio, portfolioWishlists]);
 
   // Handle switching to a different mode inside modal (e.g. going from history/edit back and forth)
-  const switchMode = (newMode: 'add' | 'update_value' | 'history' | 'edit') => {
+  const switchMode = (newMode: 'add' | 'update_value' | 'history' | 'edit' | 'close') => {
     setErrorMsg(null);
     setActiveMode(newMode);
   };
@@ -132,6 +137,30 @@ export default function InvestmentModal({ isOpen, onClose, mode: initialMode, po
     const wl = (wishlists || []).find(w => w && w.id === id);
     return sum + (wl ? (wl.current_amount ?? 0) : 0);
   }, 0);
+
+  // Find linked wishlists for current portfolio to detect capital source wallet
+  const linkedWishlistIdsForWallet = useMemo(() => {
+    if (!portfolio) return [];
+    return (portfolioWishlists || [])
+      .filter(pw => pw && pw.portfolio_id === portfolio.id)
+      .map(pw => pw.wishlist_id);
+  }, [portfolio, portfolioWishlists]);
+
+  // Find latest saving transaction to get wallet ID
+  const latestSaving = useMemo(() => {
+    if (!portfolio || linkedWishlistIdsForWallet.length === 0) return null;
+    return (transactions || [])
+      .filter(t => t.type === 'saving' 
+        && t.wishlist_id 
+        && linkedWishlistIdsForWallet.includes(t.wishlist_id) 
+        && !t.deleted_at)
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime() || (b.created_at ? new Date(b.created_at).getTime() : 0) - (a.created_at ? new Date(a.created_at).getTime() : 0))[0];
+  }, [portfolio, linkedWishlistIdsForWallet, transactions]);
+
+  const sourceWalletId = latestSaving?.to_account_id || '';
+  const sourceWallet = useMemo(() => {
+    return (accounts || []).find(a => a.id === sourceWalletId);
+  }, [accounts, sourceWalletId]);
 
   // Handle toggling wishlist selection
   const handleToggleWishlist = (id: string) => {
@@ -323,6 +352,187 @@ export default function InvestmentModal({ isOpen, onClose, mode: initialMode, po
             .eq('id', initialReturn[0].id);
           if (updateDateErr) throw updateDateErr;
         }
+
+        await refresh();
+        onClose();
+      } 
+      
+      else if (activeMode === 'close' && portfolio) {
+        // Determine wallet target/source
+        let walletId = '';
+        if (capitalSource === 'wishlist') {
+          walletId = sourceWalletId || selectedLiquidationWalletId;
+          if (!walletId) {
+            throw new Error('Dompet sumber tabungan tidak terdeteksi. Silakan pilih dompet tujuan penarikan.');
+          }
+        } else {
+          walletId = selectedLiquidationWalletId;
+          if (!walletId) {
+            throw new Error('Silakan pilih dompet tujuan penarikan.');
+          }
+        }
+
+        const effectiveCapital = currentPortfolioEffectiveCapital;
+        const curVal = portfolio.current_value;
+        const retVal = curVal - effectiveCapital;
+
+        if (capitalSource === 'wishlist') {
+          if (retVal > 0) {
+            // Get or create income source "Investasi"
+            let investasiSourceId = '';
+            let sourceObj = (sources || []).find(s => s && s.name.toLowerCase() === 'investasi');
+            if (!sourceObj) {
+              const { data: newSrc, error: srcErr } = await supabase
+                .from('income_sources')
+                .insert({ user_id: user.id, name: 'Investasi' })
+                .select()
+                .single();
+              if (srcErr) throw srcErr;
+              investasiSourceId = newSrc.id;
+            } else {
+              investasiSourceId = sourceObj.id;
+            }
+
+            // Create income transaction
+            const { error: txErr } = await supabase.rpc('create_transaction_atomic', {
+              payload: {
+                type: 'income',
+                to_account_id: walletId,
+                source_id: investasiSourceId,
+                amount: retVal,
+                description: `Keuntungan Likuidasi Investasi: ${portfolio.name}`,
+                date: new Date().toISOString().split('T')[0]
+              }
+            });
+            if (txErr) throw txErr;
+          } 
+          
+          else if (retVal < 0) {
+            // Get or create expense category "Investasi"
+            let investasiCategoryId = '';
+            let categoryObj = (categories || []).find(c => c && c.name.toLowerCase() === 'investasi');
+            if (!categoryObj) {
+              const { data: newCat, error: catErr } = await supabase
+                .from('expense_categories')
+                .insert({ user_id: user.id, name: 'Investasi' })
+                .select()
+                .single();
+              if (catErr) throw catErr;
+              investasiCategoryId = newCat.id;
+            } else {
+              investasiCategoryId = categoryObj.id;
+            }
+
+            // Get or create expense purpose "Kerugian Investasi"
+            let kerugianPurposeId = '';
+            let purposeObj = (purposes || []).find(p => p && p.name.toLowerCase() === 'kerugian investasi' && p.category_id === investasiCategoryId);
+            if (!purposeObj) {
+              const { data: newPur, error: purErr } = await supabase
+                .from('expense_purposes')
+                .insert({ user_id: user.id, category_id: investasiCategoryId, name: 'Kerugian Investasi' })
+                .select()
+                .single();
+              if (purErr) throw purErr;
+              kerugianPurposeId = newPur.id;
+            } else {
+              kerugianPurposeId = purposeObj.id;
+            }
+
+            // Reduce wishlists amount proportionally
+            const linkedWishlists = (portfolioWishlists || [])
+              .filter(pw => pw && pw.portfolio_id === portfolio.id)
+              .map(pw => wishlists.find(w => w && w.id === pw.wishlist_id))
+              .filter((w): w is NonNullable<typeof w> => !!w);
+
+            const loss = Math.abs(retVal);
+            const totalCapital = linkedWishlists.reduce((sum, w) => sum + (w.current_amount || 0), 0);
+
+            for (const w of linkedWishlists) {
+              const portion = totalCapital > 0 ? (w.current_amount || 0) / totalCapital : 0;
+              const wlLoss = Math.round(portion * loss);
+              const nextAmt = Math.max(0, (w.current_amount || 0) - wlLoss);
+
+              const { error: wlUpdErr } = await supabase
+                .from('wishlists')
+                .update({ current_amount: nextAmt })
+                .eq('id', w.id);
+              if (wlUpdErr) throw wlUpdErr;
+            }
+
+            // Create expense transaction
+            const { error: txErr } = await supabase.rpc('create_transaction_atomic', {
+              payload: {
+                type: 'expense',
+                from_account_id: walletId,
+                category_id: investasiCategoryId,
+                purpose_id: kerugianPurposeId,
+                amount: loss,
+                description: `Kerugian Likuidasi Investasi: ${portfolio.name}`,
+                date: new Date().toISOString().split('T')[0]
+              }
+            });
+            if (txErr) throw txErr;
+          }
+        } 
+        
+        else {
+          // Manual portfolio
+          if (curVal > 0) {
+            // Get or create income source "Investasi"
+            let investasiSourceId = '';
+            let sourceObj = (sources || []).find(s => s && s.name.toLowerCase() === 'investasi');
+            if (!sourceObj) {
+              const { data: newSrc, error: srcErr } = await supabase
+                .from('income_sources')
+                .insert({ user_id: user.id, name: 'Investasi' })
+                .select()
+                .single();
+              if (srcErr) throw srcErr;
+              investasiSourceId = newSrc.id;
+            } else {
+              investasiSourceId = sourceObj.id;
+            }
+
+            // Create income transaction
+            const { error: txErr } = await supabase.rpc('create_transaction_atomic', {
+              payload: {
+                type: 'income',
+                to_account_id: walletId,
+                source_id: investasiSourceId,
+                amount: curVal,
+                description: `Likuidasi Investasi: ${portfolio.name}`,
+                date: new Date().toISOString().split('T')[0]
+              }
+            });
+            if (txErr) throw txErr;
+          }
+        }
+
+        // Insert investment_returns: value_at_date = 0, date = today
+        const todayStr = new Date().toISOString().split('T')[0];
+        const { error: retUpdErr } = await supabase
+          .from('investment_returns')
+          .insert({
+            user_id: user.id,
+            portfolio_id: portfolio.id,
+            date: todayStr,
+            value_at_date: 0,
+            notes: updateNotes.trim() || 'Portofolio ditutup/likuidasi'
+          });
+        if (retUpdErr) throw retUpdErr;
+
+        // Update investment_portfolios
+        const { error: portUpdErr } = await supabase
+          .from('investment_portfolios')
+          .update({
+            is_active: false,
+            current_value: 0,
+            closed_at: new Date().toISOString(),
+            closed_value: curVal,
+            liquidation_account_id: walletId
+          })
+          .eq('id', portfolio.id);
+        if (portUpdErr) throw portUpdErr;
 
         await refresh();
         onClose();
@@ -589,12 +799,14 @@ export default function InvestmentModal({ isOpen, onClose, mode: initialMode, po
                 {activeMode === 'update_value' && `📊 Update Nilai — ${portfolio?.name}`}
                 {activeMode === 'history' && `📈 Riwayat Nilai — ${portfolio?.name}`}
                 {activeMode === 'edit' && `⚙️ Pengaturan Portofolio — ${portfolio?.name}`}
+                {activeMode === 'close' && `🔒 Tutup Portofolio — ${portfolio?.name}`}
               </h3>
               <p className="text-[11px] text-text-muted mt-0.5">
                 {activeMode === 'add' && 'Buat wadah aset investasi Anda'}
                 {activeMode === 'update_value' && 'Catat nilai terkini untuk memantau performa'}
                 {activeMode === 'history' && 'Lacak perkembangan nilai investasi dari waktu ke waktu'}
                 {activeMode === 'edit' && 'Ubah detail atau arsipkan portofolio'}
+                {activeMode === 'close' && 'Akhiri portofolio dan cairkan saldo/keuntungan'}
               </p>
             </div>
           </div>
@@ -1213,6 +1425,162 @@ export default function InvestmentModal({ isOpen, onClose, mode: initialMode, po
               </div>
 
             </div>
+          )}
+
+          {/* MODE: CLOSE PORTFOLIO */}
+          {activeMode === 'close' && portfolio && (
+            <form onSubmit={handleSubmit} className="space-y-5">
+              
+              {/* Summary of Return */}
+              <div className="p-4 bg-surface-alt/30 border border-line rounded-2xl text-[12px] space-y-2.5">
+                <div className="flex justify-between items-center pb-2 border-b border-line/50">
+                  <span className="text-text-muted">Modal Pokok:</span>
+                  <span className="font-extrabold text-text-primary">{fmt(currentPortfolioEffectiveCapital)}</span>
+                </div>
+                <div className="flex justify-between items-center pb-2 border-b border-line/50">
+                  <span className="text-text-muted">Nilai Likuidasi (Pasar):</span>
+                  <span className="font-extrabold text-text-primary">{fmt(portfolio.current_value)}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-text-muted">Estimasi Return:</span>
+                  {(() => {
+                    const retNominal = portfolio.current_value - currentPortfolioEffectiveCapital;
+                    const retPercent = currentPortfolioEffectiveCapital > 0 
+                      ? (retNominal / currentPortfolioEffectiveCapital) * 100 
+                      : 0;
+                    return (
+                      <span className={clsx("font-extrabold", retNominal >= 0 ? "text-emerald-500" : "text-rose-500")}>
+                        {retNominal >= 0 ? '+' : ''}{fmt(retNominal)} ({retNominal >= 0 ? '+' : ''}{retPercent.toFixed(2)}%)
+                      </span>
+                    );
+                  })()}
+                </div>
+              </div>
+
+              {/* Liquidation Action Description */}
+              <div className="space-y-3.5 bg-surface-alt/35 border border-line p-4 rounded-2xl">
+                <h4 className="text-[12px] font-bold text-text-primary flex items-center gap-1.5">
+                  🏦 Alokasi Dana Penarikan
+                </h4>
+
+                {capitalSource === 'wishlist' ? (
+                  <div className="space-y-2.5">
+                    {sourceWallet ? (
+                      <div className="space-y-1.5">
+                        <p className="text-[11px] text-text-secondary font-medium">
+                          Dompet sumber tabungan terdeteksi:
+                        </p>
+                        <div className="p-3 bg-surface border border-line rounded-xl text-[12px] font-extrabold text-text-primary">
+                          💳 {sourceWallet.name}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <label className="block text-[11px] font-bold text-text-secondary">
+                          ⚠️ Dompet Sumber Tidak Terdeteksi. Pilih Wallet Tujuan:
+                        </label>
+                        <select
+                          value={selectedLiquidationWalletId}
+                          onChange={e => setSelectedLiquidationWalletId(e.target.value)}
+                          className="w-full bg-surface border border-line rounded-xl px-3 py-2.5 text-[12px] font-bold text-text-primary outline-none focus:border-accent"
+                          required
+                        >
+                          <option value="">-- Pilih Akun --</option>
+                          {accounts.filter(a => a.type !== 'investasi').map(a => (
+                            <option key={a.id} value={a.id}>
+                              {a.name} ({fmt(a.balance)})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    {/* Explanatory text */}
+                    {(() => {
+                      const retVal = portfolio.current_value - currentPortfolioEffectiveCapital;
+                      return (
+                        <p className="text-[10px] text-text-muted leading-relaxed">
+                          {retVal > 0 && `Keuntungan sebesar ${fmt(retVal)} akan otomatis masuk ke dompet di atas sebagai Pemasukan. Modal awal tetap tersimpan di Tabungan.`}
+                          {retVal < 0 && `Kerugian sebesar ${fmt(Math.abs(retVal))} akan dipotong dari dompet di atas sebagai Pengeluaran. Saldo Tabungan (Wishlist) juga akan diturunkan secara proporsional.`}
+                          {retVal === 0 && `Nilai likuidasi sama dengan modal tabungan. Tidak ada transaksi keuangan (pemasukan/pengeluaran) yang perlu dibuat.`}
+                        </p>
+                      );
+                    })()}
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    <div className="space-y-2">
+                      <label className="block text-[11px] font-bold text-text-secondary">
+                        Pilih Dompet Tujuan Penarikan:
+                      </label>
+                      <select
+                        value={selectedLiquidationWalletId}
+                        onChange={e => setSelectedLiquidationWalletId(e.target.value)}
+                        className="w-full bg-surface border border-line rounded-xl px-3 py-2.5 text-[12px] font-bold text-text-primary outline-none focus:border-accent"
+                        required
+                      >
+                        <option value="">-- Pilih Akun --</option>
+                        {accounts.filter(a => a.type !== 'investasi').map(a => (
+                          <option key={a.id} value={a.id}>
+                            {a.name} ({fmt(a.balance)})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <p className="text-[10px] text-text-muted leading-relaxed">
+                      Seluruh nilai investasi saat ini sebesar <span className="font-extrabold text-text-primary">{fmt(portfolio.current_value)}</span> akan dicairkan dan masuk ke dompet pilihan di atas sebagai Pemasukan.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Close Notes */}
+              <div className="space-y-2">
+                <label className="block text-[13px] font-semibold text-text-secondary">Catatan Penutupan (Optional)</label>
+                <div className="relative">
+                  <BookOpen className="absolute left-3.5 top-3.5 w-4 h-4 text-text-muted" />
+                  <textarea 
+                    placeholder="Tulis alasan penutupan portofolio ini..."
+                    value={updateNotes}
+                    onChange={e => setUpdateNotes(e.target.value)}
+                    rows={2}
+                    className="w-full bg-surface border border-line rounded-2xl pl-10 pr-4 py-3 text-[13px] font-medium text-text-primary placeholder:text-text-muted/60 focus:border-accent focus:ring-1 focus:ring-accent/10 outline-none transition-all resize-none"
+                  />
+                </div>
+              </div>
+
+              {/* Warning alert */}
+              <div className="bg-amber-500/10 border border-amber-500/20 text-amber-500 text-[10px] px-3.5 py-2.5 rounded-xl flex items-start gap-2.5">
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>
+                  <strong>PENTING:</strong> Tindakan ini tidak dapat dibatalkan. Portofolio akan dinonaktifkan secara permanen dan dipindahkan ke riwayat tab ditutup.
+                </span>
+              </div>
+
+              {/* Submit / Cancel Buttons */}
+              <div className="flex gap-3 pt-3 border-t border-line">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="px-6 py-3 bg-surface border border-line text-text-primary rounded-2xl text-[13px] font-bold hover:bg-surface-hover transition-all"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="flex-1 py-3.5 bg-amber-500 hover:bg-amber-600 text-white rounded-2xl text-[13px] font-extrabold shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center gap-2"
+                >
+                  {loading ? (
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <span>Konfirmasi & Tutup Portofolio</span>
+                  )}
+                </button>
+              </div>
+
+            </form>
           )}
 
         </div>

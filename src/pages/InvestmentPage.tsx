@@ -9,7 +9,8 @@ import {
   ClockCounterClockwise, 
   Stack,
   Eye,
-  EyeSlash
+  EyeSlash,
+  XCircle
 } from '@phosphor-icons/react';
 import clsx from 'clsx';
 import { useData } from '../context/DataContext';
@@ -17,6 +18,15 @@ import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
 import { fmt } from '../lib/utils';
 import InvestmentModal from '../components/InvestmentModal';
+
+const formatDateSafe = (dateStr: string | null | undefined) => {
+  if (!dateStr) return '-';
+  try {
+    return format(new Date(dateStr), 'dd MMM yyyy', { locale: id });
+  } catch (e) {
+    return dateStr;
+  }
+};
 
 const COLORS = [
   'var(--chart-1)',
@@ -27,10 +37,11 @@ const COLORS = [
 ];
 
 export default function InvestmentPage() {
-  const { portfolios, portfolioWishlists, investmentReturns, wishlists } = useData();
+  const { portfolios, portfolioWishlists, investmentReturns, wishlists, accounts } = useData();
   const [isInvestmentModalOpen, setIsInvestmentModalOpen] = useState(false);
-  const [investmentModalMode, setInvestmentModalMode] = useState<'add' | 'update_value' | 'history' | 'edit'>('add');
+  const [investmentModalMode, setInvestmentModalMode] = useState<'add' | 'update_value' | 'history' | 'edit' | 'close'>('add');
   const [selectedPortfolio, setSelectedPortfolio] = useState<any>(null);
+  const [portfolioTab, setPortfolioTab] = useState<'aktif' | 'ditutup'>('aktif');
   const [showBalance, setShowBalance] = useState(() => {
     const saved = localStorage.getItem('showBalance');
     return saved !== null ? JSON.parse(saved) : true;
@@ -56,6 +67,10 @@ export default function InvestmentPage() {
 
   const activePortfolios = useMemo(() => {
     return portfolios.filter(p => p.is_active);
+  }, [portfolios]);
+
+  const closedPortfolios = useMemo(() => {
+    return portfolios.filter(p => !p.is_active);
   }, [portfolios]);
 
   const totalCapital = useMemo(() => {
@@ -194,7 +209,7 @@ export default function InvestmentPage() {
       </div>
 
       {/* Main Content */}
-      {activePortfolios.length === 0 ? (
+      {portfolios.length === 0 ? (
         <div className="card p-12 text-center flex flex-col items-center justify-center space-y-4 max-w-lg mx-auto border border-line">
           <div className="w-16 h-16 rounded-3xl bg-accent/10 flex items-center justify-center animate-bounce">
             <Briefcase size={32} className="text-accent" />
@@ -220,138 +235,289 @@ export default function InvestmentPage() {
       ) : (
         <>
           {/* Portfolio Grid List */}
-          <div className="space-y-3">
-            <div className="flex justify-between items-center px-1">
-              <h3 className="text-[13px] font-bold text-text-primary uppercase tracking-wider flex items-center gap-1.5">
-                <Briefcase size={16} weight="duotone" className="text-accent" />
-                <span>Aset Investasi Anda</span>
-              </h3>
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-1">
+              <div className="flex items-center gap-4 flex-wrap">
+                <h3 className="text-[13px] font-bold text-text-primary uppercase tracking-wider flex items-center gap-1.5">
+                  <Briefcase size={16} weight="duotone" className="text-accent" />
+                  <span>Aset Investasi Anda</span>
+                </h3>
+                
+                {/* Tab Selector */}
+                <div className="flex bg-surface-alt/25 p-1 rounded-2xl border border-line shadow-sm min-w-[200px]">
+                  <button
+                    type="button"
+                    onClick={() => setPortfolioTab('aktif')}
+                    className={clsx(
+                      "px-3 py-1.5 rounded-xl text-[10px] font-bold transition-all flex items-center justify-center gap-1.5",
+                      portfolioTab === 'aktif'
+                        ? "bg-accent text-white shadow-md font-extrabold"
+                        : "text-text-muted hover:text-text-primary hover:bg-surface-hover/30"
+                    )}
+                  >
+                    🟢 Aktif ({activePortfolios.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPortfolioTab('ditutup')}
+                    className={clsx(
+                      "px-3 py-1.5 rounded-xl text-[10px] font-bold transition-all flex items-center justify-center gap-1.5",
+                      portfolioTab === 'ditutup'
+                        ? "bg-accent text-white shadow-md font-extrabold"
+                        : "text-text-muted hover:text-text-primary hover:bg-surface-hover/30"
+                    )}
+                  >
+                    🔒 Ditutup ({closedPortfolios.length})
+                  </button>
+                </div>
+              </div>
+
               <button
                 onClick={() => {
                   setSelectedPortfolio(null);
                   setInvestmentModalMode('add');
                   setIsInvestmentModalOpen(true);
                 }}
-                className="px-3.5 py-1.5 bg-accent hover:bg-accent-dark text-white rounded-xl text-[11px] font-bold shadow-sm shadow-accent/15 transition-all flex items-center gap-1"
+                className="px-3.5 py-1.5 bg-accent hover:bg-accent-dark text-white rounded-xl text-[11px] font-bold shadow-sm shadow-accent/15 transition-all flex items-center gap-1 self-start sm:self-auto"
               >
                 <Plus size={14} weight="bold" />
                 <span>Portofolio Baru</span>
               </button>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {activePortfolios.map(p => {
-                const capital = getEffectiveCapital(p);
-                const currentVal = p.current_value;
-                const retNom = currentVal - capital;
-                const retPct = capital > 0 ? (retNom / capital) * 100 : 0;
-                
-                // Wishlist info
-                const linked = portfolioWishlists.filter(pw => pw.portfolio_id === p.id);
-                
-                return (
-                  <div key={p.id} className="card p-5 border border-line bg-surface/50 backdrop-blur-md hover:border-accent/30 transition-all flex flex-col justify-between group">
+            {portfolioTab === 'aktif' ? (
+              activePortfolios.length === 0 ? (
+                <div className="card p-12 text-center flex flex-col items-center justify-center space-y-3 border border-line">
+                  <p className="text-[12px] text-text-muted font-bold">Tidak ada portofolio aktif.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {activePortfolios.map(p => {
+                    const capital = getEffectiveCapital(p);
+                    const currentVal = p.current_value;
+                    const retNom = currentVal - capital;
+                    const retPct = capital > 0 ? (retNom / capital) * 100 : 0;
                     
-                    {/* Title & Badge */}
-                    <div className="space-y-1">
-                      <div className="flex justify-between items-start gap-2">
-                        <h4 className="text-[13px] font-extrabold text-text-primary group-hover:text-accent transition-colors truncate" title={p.name}>
-                          {p.name}
-                        </h4>
-                        <span className="text-[9px] px-2 py-0.5 rounded-md bg-accent/15 text-accent font-bold uppercase tracking-wider shrink-0">
-                          {p.instrument_type || 'Aset'}
-                        </span>
-                      </div>
-                      {p.notes && (
-                        <p className="text-[10px] text-text-muted italic truncate">"{p.notes}"</p>
-                      )}
-                    </div>
-
-                    {/* Capital vs Current Value */}
-                    <div className="grid grid-cols-2 gap-2 my-4 bg-surface-alt/10 border border-line/45 p-3 rounded-2xl text-[11px]">
-                      <div>
-                        <p className="text-text-muted text-[9px] font-bold uppercase">Modal</p>
-                        <p className="font-extrabold text-text-primary truncate">{showBalance ? fmt(capital) : '••••••'}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-text-muted text-[9px] font-bold uppercase">Nilai Kini</p>
-                        <p className="font-extrabold text-accent truncate">{showBalance ? fmt(currentVal) : '••••••'}</p>
-                      </div>
-                    </div>
-
-                    {/* Return percentage bar/badge & wishlist links */}
-                    <div className="space-y-3 mb-4">
-                      <div className={clsx(
-                        "flex items-center justify-between p-3 rounded-xl text-[11px] font-extrabold",
-                        retNom >= 0 ? "bg-success/10 text-success" : "bg-danger/10 text-danger"
-                      )}>
-                        <span className="flex items-center gap-1.5">
-                          {retNom >= 0 ? <TrendUp size={14} /> : <TrendDown size={14} />}
-                          Return Aset:
-                        </span>
-                        <span className="text-right flex items-center gap-1 flex-wrap justify-end">
-                          <span>{retNom >= 0 ? '+' : ''}{retPct.toFixed(1)}%</span>
-                          <span className="opacity-80 font-bold text-[9px]">
-                            ({retNom >= 0 ? '+' : ''}{showBalance ? fmt(retNom) : '••••'})
-                          </span>
-                        </span>
-                      </div>
-
-                      {/* Linked wishlist indicator */}
-                      {linked.length > 0 && (
-                        <div className="flex flex-wrap items-center gap-1.5 text-[9px] text-text-muted font-bold uppercase bg-surface-alt/30 border border-line/40 px-2.5 py-1.5 rounded-xl">
-                          <Stack size={14} className="text-accent shrink-0" />
-                          <span className="text-text-secondary truncate">
-                            Terhubung ke {linked.length} Tabungan
-                          </span>
+                    // Wishlist info
+                    const linked = portfolioWishlists.filter(pw => pw.portfolio_id === p.id);
+                    
+                    return (
+                      <div key={p.id} className="card p-5 border border-line bg-surface/50 backdrop-blur-md hover:border-accent/30 transition-all flex flex-col justify-between group">
+                        
+                        {/* Title & Badge */}
+                        <div className="space-y-1">
+                          <div className="flex justify-between items-start gap-2">
+                            <h4 className="text-[13px] font-extrabold text-text-primary group-hover:text-accent transition-colors truncate" title={p.name}>
+                              {p.name}
+                            </h4>
+                            <span className="text-[9px] px-2 py-0.5 rounded-md bg-accent/15 text-accent font-bold uppercase tracking-wider shrink-0">
+                              {p.instrument_type || 'Aset'}
+                            </span>
+                          </div>
+                          {p.notes && (
+                            <p className="text-[10px] text-text-muted italic truncate">"{p.notes}"</p>
+                          )}
                         </div>
-                      )}
-                    </div>
 
-                    {/* Card Action Buttons */}
-                    <div className="grid grid-cols-3 gap-2 border-t border-line/50 pt-3">
-                      <button
-                        onClick={() => {
-                          setSelectedPortfolio(p);
-                          setInvestmentModalMode('update_value');
-                          setIsInvestmentModalOpen(true);
-                        }}
-                        className="py-2 bg-surface border border-line text-text-primary rounded-xl text-[11px] font-bold hover:bg-accent/5 hover:text-accent hover:border-accent/25 transition-all text-center flex items-center justify-center gap-0.5"
-                        title="Update Nilai"
-                      >
-                        <span>📊</span> Update
-                      </button>
-                      
-                      <button
+                        {/* Capital vs Current Value */}
+                        <div className="grid grid-cols-2 gap-2 my-4 bg-surface-alt/10 border border-line/45 p-3 rounded-2xl text-[11px]">
+                          <div>
+                            <p className="text-text-muted text-[9px] font-bold uppercase">Modal</p>
+                            <p className="font-extrabold text-text-primary truncate">{showBalance ? fmt(capital) : '••••••'}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-text-muted text-[9px] font-bold uppercase">Nilai Kini</p>
+                            <p className="font-extrabold text-accent truncate">{showBalance ? fmt(currentVal) : '••••••'}</p>
+                          </div>
+                        </div>
+
+                        {/* Return percentage bar/badge & wishlist links */}
+                        <div className="space-y-3 mb-4">
+                          <div className={clsx(
+                            "flex items-center justify-between p-3 rounded-xl text-[11px] font-extrabold",
+                            retNom >= 0 ? "bg-success/10 text-success" : "bg-danger/10 text-danger"
+                          )}>
+                            <span className="flex items-center gap-1.5">
+                              {retNom >= 0 ? <TrendUp size={14} /> : <TrendDown size={14} />}
+                              Return Aset:
+                            </span>
+                            <span className="text-right flex items-center gap-1 flex-wrap justify-end">
+                              <span>{retNom >= 0 ? '+' : ''}{retPct.toFixed(1)}%</span>
+                              <span className="opacity-80 font-bold text-[9px]">
+                                ({retNom >= 0 ? '+' : ''}{showBalance ? fmt(retNom) : '••••'})
+                              </span>
+                            </span>
+                          </div>
+
+                          {/* Linked wishlist indicator */}
+                          {linked.length > 0 && (
+                            <div className="flex flex-wrap items-center gap-1.5 text-[9px] text-text-muted font-bold uppercase bg-surface-alt/30 border border-line/40 px-2.5 py-1.5 rounded-xl">
+                              <Stack size={14} className="text-accent shrink-0" />
+                              <span className="text-text-secondary truncate">
+                                Terhubung ke {linked.length} Tabungan
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Card Action Buttons */}
+                        <div className="grid grid-cols-4 gap-1.5 border-t border-line/50 pt-3">
+                          <button
+                            onClick={() => {
+                              setSelectedPortfolio(p);
+                              setInvestmentModalMode('update_value');
+                              setIsInvestmentModalOpen(true);
+                            }}
+                            className="py-2 bg-surface border border-line text-text-primary rounded-xl text-[10px] font-bold hover:bg-accent/5 hover:text-accent hover:border-accent/25 transition-all text-center flex items-center justify-center gap-0.5"
+                            title="Update Nilai"
+                          >
+                            <span>📊</span> Update
+                          </button>
+                          
+                          <button
+                            onClick={() => {
+                              setSelectedPortfolio(p);
+                              setInvestmentModalMode('history');
+                              setIsInvestmentModalOpen(true);
+                            }}
+                            className="py-2 bg-surface border border-line text-text-primary rounded-xl text-[10px] font-bold hover:bg-surface-hover transition-all text-center flex items-center justify-center gap-0.5"
+                            title="Riwayat Perubahan"
+                          >
+                            <ClockCounterClockwise size={13} className="text-text-muted" />
+                            <span>Riwayat</span>
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              setSelectedPortfolio(p);
+                              setInvestmentModalMode('edit');
+                              setIsInvestmentModalOpen(true);
+                            }}
+                            className="py-2 bg-surface border border-line text-text-primary rounded-xl text-[10px] font-bold hover:bg-surface-hover transition-all text-center flex items-center justify-center gap-0.5"
+                            title="Edit / Kelola"
+                          >
+                            <Gear size={13} className="text-text-muted" />
+                            <span>Ubah</span>
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              setSelectedPortfolio(p);
+                              setInvestmentModalMode('close');
+                              setIsInvestmentModalOpen(true);
+                            }}
+                            className="py-2 bg-surface border border-line text-text-primary rounded-xl text-[10px] font-bold hover:bg-amber-500/10 hover:text-amber-500 hover:border-amber-500/25 transition-all text-center flex items-center justify-center gap-0.5"
+                            title="Tutup Portofolio"
+                          >
+                            <XCircle size={13} className="text-text-muted hover:text-amber-500" />
+                            <span>Tutup</span>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )
+            ) : (
+              /* DITUTUP PORTFOLIOS GRID */
+              closedPortfolios.length === 0 ? (
+                <div className="card p-12 text-center flex flex-col items-center justify-center space-y-3 border border-line">
+                  <p className="text-[12px] text-text-muted font-bold">Tidak ada portofolio yang ditutup.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {closedPortfolios.map(p => {
+                    const closedVal = p.closed_value ?? 0;
+                    const capital = p.initial_capital ?? 0;
+                    const retNom = closedVal - capital;
+                    const retPct = capital > 0 ? (retNom / capital) * 100 : 0;
+                    
+                    // Wishlist info & liquidation account info
+                    const linked = portfolioWishlists.filter(pw => pw.portfolio_id === p.id);
+                    const liqAccount = accounts.find(a => a.id === p.liquidation_account_id);
+                    
+                    return (
+                      <div 
+                        key={p.id} 
                         onClick={() => {
                           setSelectedPortfolio(p);
                           setInvestmentModalMode('history');
                           setIsInvestmentModalOpen(true);
                         }}
-                        className="py-2 bg-surface border border-line text-text-primary rounded-xl text-[11px] font-bold hover:bg-surface-hover transition-all text-center flex items-center justify-center gap-0.5"
-                        title="Riwayat Perubahan"
+                        className="card p-5 border border-line/45 bg-surface-alt/10 opacity-85 hover:opacity-100 hover:border-line transition-all flex flex-col justify-between cursor-pointer group"
                       >
-                        <ClockCounterClockwise size={14} className="text-text-muted" />
-                        <span>Riwayat</span>
-                      </button>
+                        {/* Title & Badge */}
+                        <div className="space-y-1">
+                          <div className="flex justify-between items-start gap-2">
+                            <h4 className="text-[13px] font-extrabold text-text-secondary group-hover:text-text-primary transition-colors truncate" title={p.name}>
+                              {p.name}
+                            </h4>
+                            <span className="text-[9px] px-2 py-0.5 rounded-md bg-surface-alt border border-line/55 text-text-muted font-bold uppercase tracking-wider shrink-0 flex items-center gap-1">
+                              🔒 Ditutup
+                            </span>
+                          </div>
+                          {p.closed_at && (
+                            <p className="text-[9px] text-text-muted font-semibold">
+                              📅 Ditutup pada: {formatDateSafe(p.closed_at)}
+                            </p>
+                          )}
+                        </div>
 
-                      <button
-                        onClick={() => {
-                          setSelectedPortfolio(p);
-                          setInvestmentModalMode('edit');
-                          setIsInvestmentModalOpen(true);
-                        }}
-                        className="py-2 bg-surface border border-line text-text-primary rounded-xl text-[11px] font-bold hover:bg-surface-hover transition-all text-center flex items-center justify-center gap-0.5"
-                        title="Edit / Kelola"
-                      >
-                        <Gear size={14} className="text-text-muted" />
-                        <span>Ubah</span>
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                        {/* Capital vs Closed Value */}
+                        <div className="grid grid-cols-2 gap-2 my-4 bg-surface-alt/20 border border-line/30 p-3 rounded-2xl text-[11px]">
+                          <div>
+                            <p className="text-text-muted text-[9px] font-bold uppercase">Modal Awal</p>
+                            <p className="font-extrabold text-text-primary truncate">{showBalance ? fmt(capital) : '••••••'}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-text-muted text-[9px] font-bold uppercase">Nilai Akhir</p>
+                            <p className="font-extrabold text-text-secondary truncate">{showBalance ? fmt(closedVal) : '••••••'}</p>
+                          </div>
+                        </div>
+
+                        {/* Return percentage bar/badge */}
+                        <div className="space-y-3">
+                          <div className={clsx(
+                            "flex items-center justify-between p-3 rounded-xl text-[11px] font-extrabold",
+                            retNom >= 0 ? "bg-emerald-500/5 text-emerald-500/85" : "bg-rose-500/5 text-rose-500/85"
+                          )}>
+                            <span className="flex items-center gap-1.5">
+                              {retNom >= 0 ? <TrendUp size={14} /> : <TrendDown size={14} />}
+                              Return Realisasi:
+                            </span>
+                            <span className="text-right flex items-center gap-1 flex-wrap justify-end">
+                              <span>{retNom >= 0 ? '+' : ''}{retPct.toFixed(1)}%</span>
+                              <span className="opacity-80 font-bold text-[9px]">
+                                ({retNom >= 0 ? '+' : ''}{showBalance ? fmt(retNom) : '••••'})
+                              </span>
+                            </span>
+                          </div>
+
+                          {/* Linked wishlist / source info & wallet info */}
+                          <div className="flex flex-col gap-1.5 text-[9px] text-text-muted font-bold uppercase bg-surface-alt/30 border border-line/40 p-2.5 rounded-xl">
+                            <div className="flex items-center gap-1.5">
+                              <Stack size={13} className="text-text-muted shrink-0" />
+                              <span className="truncate">
+                                Sumber: {linked.length > 0 ? `Link Tabungan (${linked.length})` : 'Input Manual'}
+                              </span>
+                            </div>
+                            {liqAccount && (
+                              <div className="flex items-center gap-1.5 pt-1.5 border-t border-line/20">
+                                <span>🏦</span>
+                                <span className="truncate text-text-secondary">
+                                  Dana ditarik ke: {liqAccount.name}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )
+            )}
+          </div>
 
             {/* Charts Section */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 pt-3">
@@ -457,9 +623,8 @@ export default function InvestmentPage() {
                 )}
               </div>
             </div>
-          </div>
-        </>
-      )}
+          </>
+        )}
 
       {/* Investment Modal */}
       <InvestmentModal

@@ -80,6 +80,9 @@ export interface InvestmentPortfolio extends BaseEntity {
   current_value: number;
   notes?: string | null;
   is_active: boolean;
+  closed_at?: string | null;
+  closed_value?: number | null;
+  liquidation_account_id?: string | null;
 }
 
 // ============================================
