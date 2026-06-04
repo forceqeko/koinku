@@ -9,7 +9,6 @@ import EditProfileModal from '../components/EditProfileModal';
 import AppSettingsModal from '../components/AppSettingsModal';
 import { toast } from '../components/Toast';
 import { fmt } from '../lib/utils';
-import ThemeDropdown from '../components/ThemeDropdown';
 
 type SettingTab = 'akun' | 'sumber' | 'kategori' | 'tujuan' | 'wishlist' | 'tagihan';
 
