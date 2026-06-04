@@ -289,8 +289,11 @@ export default function InvestmentPage() {
                           {retNom >= 0 ? <TrendUp size={14} /> : <TrendDown size={14} />}
                           Return Aset:
                         </span>
-                        <span className="text-right">
-                          {retNom >= 0 ? '+' : ''}{retPct.toFixed(1)}%
+                        <span className="text-right flex items-center gap-1 flex-wrap justify-end">
+                          <span>{retNom >= 0 ? '+' : ''}{retPct.toFixed(1)}%</span>
+                          <span className="opacity-80 font-bold text-[9px]">
+                            ({retNom >= 0 ? '+' : ''}{showBalance ? fmt(retNom) : '••••'})
+                          </span>
                         </span>
                       </div>
 
