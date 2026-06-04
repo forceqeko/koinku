@@ -10,7 +10,8 @@ import {
   Stack,
   Eye,
   EyeSlash,
-  XCircle
+  XCircle,
+  Lock
 } from '@phosphor-icons/react';
 import clsx from 'clsx';
 import { useData } from '../context/DataContext';
@@ -236,53 +237,57 @@ export default function InvestmentPage() {
         <>
           {/* Portfolio Grid List */}
           <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-1">
-              <div className="flex items-center gap-4 flex-wrap">
-                <h3 className="text-[13px] font-bold text-text-primary uppercase tracking-wider flex items-center gap-1.5">
-                  <Briefcase size={16} weight="duotone" className="text-accent" />
-                  <span>Aset Investasi Anda</span>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-1 pb-2 border-b border-line/60">
+              <div className="flex items-center gap-3">
+                <Briefcase size={20} weight="duotone" className="text-accent" />
+                <h3 className="text-[14px] font-bold text-text-primary uppercase tracking-wider">
+                  Aset Investasi Anda
                 </h3>
-                
+              </div>
+              
+              <div className="flex items-center gap-3 flex-wrap">
                 {/* Tab Selector */}
-                <div className="flex bg-surface-alt/25 p-1 rounded-2xl border border-line shadow-sm min-w-[200px]">
+                <div className="flex bg-surface-alt/40 p-1 rounded-2xl border border-line shadow-sm">
                   <button
                     type="button"
                     onClick={() => setPortfolioTab('aktif')}
                     className={clsx(
-                      "px-3 py-1.5 rounded-xl text-[10px] font-bold transition-all flex items-center justify-center gap-1.5",
+                      "px-4 py-2 rounded-xl text-[11px] font-bold transition-all flex items-center gap-1.5",
                       portfolioTab === 'aktif'
-                        ? "bg-accent text-white shadow-md font-extrabold"
+                        ? "bg-accent text-white shadow-sm font-extrabold"
                         : "text-text-muted hover:text-text-primary hover:bg-surface-hover/30"
                     )}
                   >
-                    🟢 Aktif ({activePortfolios.length})
+                    <TrendUp size={14} weight={portfolioTab === 'aktif' ? "bold" : "regular"} className={portfolioTab === 'aktif' ? "text-white" : "text-text-muted"} />
+                    <span>Aktif ({activePortfolios.length})</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setPortfolioTab('ditutup')}
                     className={clsx(
-                      "px-3 py-1.5 rounded-xl text-[10px] font-bold transition-all flex items-center justify-center gap-1.5",
+                      "px-4 py-2 rounded-xl text-[11px] font-bold transition-all flex items-center gap-1.5",
                       portfolioTab === 'ditutup'
-                        ? "bg-accent text-white shadow-md font-extrabold"
+                        ? "bg-accent text-white shadow-sm font-extrabold"
                         : "text-text-muted hover:text-text-primary hover:bg-surface-hover/30"
                     )}
                   >
-                    🔒 Ditutup ({closedPortfolios.length})
+                    <Lock size={14} weight={portfolioTab === 'ditutup' ? "fill" : "regular"} className={portfolioTab === 'ditutup' ? "text-white" : "text-text-muted"} />
+                    <span>Ditutup ({closedPortfolios.length})</span>
                   </button>
                 </div>
-              </div>
 
-              <button
-                onClick={() => {
-                  setSelectedPortfolio(null);
-                  setInvestmentModalMode('add');
-                  setIsInvestmentModalOpen(true);
-                }}
-                className="px-3.5 py-1.5 bg-accent hover:bg-accent-dark text-white rounded-xl text-[11px] font-bold shadow-sm shadow-accent/15 transition-all flex items-center gap-1 self-start sm:self-auto"
-              >
-                <Plus size={14} weight="bold" />
-                <span>Portofolio Baru</span>
-              </button>
+                <button
+                  onClick={() => {
+                    setSelectedPortfolio(null);
+                    setInvestmentModalMode('add');
+                    setIsInvestmentModalOpen(true);
+                  }}
+                  className="px-4 py-2 bg-accent hover:bg-accent-dark text-white rounded-xl text-[11px] font-bold shadow-sm shadow-accent/15 transition-all flex items-center gap-1.5"
+                >
+                  <Plus size={14} weight="bold" />
+                  <span>Portofolio Baru</span>
+                </button>
+              </div>
             </div>
             
             {portfolioTab === 'aktif' ? (
