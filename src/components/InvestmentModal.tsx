@@ -150,7 +150,7 @@ export default function InvestmentModal({ isOpen, onClose, mode: initialMode, po
   const latestSaving = useMemo(() => {
     if (!portfolio || linkedWishlistIdsForWallet.length === 0) return null;
     return (transactions || [])
-      .filter(t => t.type === 'saving' 
+      .filter(t => (t.type === 'saving' || t.type === 'transfer') 
         && t.wishlist_id 
         && linkedWishlistIdsForWallet.includes(t.wishlist_id) 
         && !t.deleted_at)

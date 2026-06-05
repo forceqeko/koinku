@@ -67,6 +67,8 @@ export interface Wishlist extends BaseEntity {
   name: string;
   target_amount: number;
   current_amount: number;
+  is_closed?: boolean;
+  closed_at?: string | null;
 }
 
 // ============================================
