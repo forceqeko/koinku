@@ -120,6 +120,14 @@ export default function MoveSavingBalanceModal({ isOpen, onClose, wishlist }: Mo
         if (t.from_account_id) {
           balances[t.from_account_id] = (balances[t.from_account_id] || 0) - Number(t.amount);
         }
+      } else if (t.type === 'expense') {
+        if (t.from_account_id) {
+          balances[t.from_account_id] = (balances[t.from_account_id] || 0) - Number(t.amount);
+        }
+      } else if (t.type === 'income') {
+        if (t.to_account_id) {
+          balances[t.to_account_id] = (balances[t.to_account_id] || 0) + Number(t.amount);
+        }
       }
     });
 

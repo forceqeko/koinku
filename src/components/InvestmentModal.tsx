@@ -28,7 +28,7 @@ interface InvestmentModalProps {
 
 export default function InvestmentModal({ isOpen, onClose, mode: initialMode, portfolio }: InvestmentModalProps) {
   const { user } = useAuth();
-  const { wishlists, portfolioWishlists, investmentReturns, transactions, refresh, accounts, categories, purposes, sources } = useData();
+  const { portfolios, wishlists, portfolioWishlists, investmentReturns, transactions, refresh, accounts, categories, purposes, sources } = useData();
 
   // Modal active mode (can switch between history and edit inside the modal)
   const [activeMode, setActiveMode] = useState<'add' | 'update_value' | 'history' | 'edit' | 'close'>(initialMode);
@@ -457,21 +457,24 @@ export default function InvestmentModal({ isOpen, onClose, mode: initialMode, po
                 .update({ current_amount: nextAmt })
                 .eq('id', w.id);
               if (wlUpdErr) throw wlUpdErr;
-            }
 
-            // Create expense transaction
-            const { error: txErr } = await supabase.rpc('create_transaction_atomic', {
-              payload: {
-                type: 'expense',
-                from_account_id: walletId,
-                category_id: investasiCategoryId,
-                purpose_id: kerugianPurposeId,
-                amount: loss,
-                description: `Kerugian Likuidasi Investasi: ${portfolio.name}`,
-                date: new Date().toISOString().split('T')[0]
+              if (wlLoss > 0) {
+                // Create expense transaction linked to this wishlist
+                const { error: txErr } = await supabase.rpc('create_transaction_atomic', {
+                  payload: {
+                    type: 'expense',
+                    from_account_id: walletId,
+                    category_id: investasiCategoryId,
+                    purpose_id: kerugianPurposeId,
+                    amount: wlLoss,
+                    wishlist_id: w.id,
+                    description: `Kerugian Likuidasi Investasi: ${portfolio.name}`,
+                    date: new Date().toISOString().split('T')[0]
+                  }
+                });
+                if (txErr) throw txErr;
               }
-            });
-            if (txErr) throw txErr;
+            }
           }
         } 
         
@@ -945,8 +948,12 @@ export default function InvestmentModal({ isOpen, onClose, mode: initialMode, po
                       {wishlists.map(w => {
                         const isSelected = selectedWishlistIds.includes(w.id);
                         
-                        // Check if this wishlist is already linked to another portfolio (only relevant when adding or for other portfolios)
-                        const otherLinkedLink = portfolioWishlists.find(pw => pw.wishlist_id === w.id && pw.portfolio_id !== portfolio?.id);
+                        // Check if this wishlist is already linked to another active portfolio (only relevant when adding or for other portfolios)
+                        const otherLinkedLink = portfolioWishlists.find(pw => {
+                          if (pw.wishlist_id !== w.id || pw.portfolio_id === portfolio?.id) return false;
+                          const otherPort = portfolios.find(p => p.id === pw.portfolio_id);
+                          return otherPort ? otherPort.is_active : false;
+                        });
                         
                         return (
                           <button

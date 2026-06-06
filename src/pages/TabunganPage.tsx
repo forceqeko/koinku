@@ -53,6 +53,63 @@ export default function TabunganPage() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Patch to fix legacy investment loss transactions wishlist_ids
+  useEffect(() => {
+    async function patchLegacyTransactions() {
+      try {
+        const { data: txs, error: txError } = await supabase
+          .from('transactions')
+          .select('id, description')
+          .eq('type', 'expense')
+          .is('wishlist_id', null)
+          .like('description', 'Kerugian Likuidasi Investasi:%');
+
+        if (txError) return;
+        if (!txs || txs.length === 0) return;
+
+        let patched = false;
+        for (const tx of txs) {
+          const portName = tx.description.replace('Kerugian Likuidasi Investasi: ', '').trim();
+          
+          // Find portfolio by name
+          const { data: ports } = await supabase
+            .from('investment_portfolios')
+            .select('id')
+            .eq('name', portName);
+
+          if (ports && ports.length > 0) {
+            // Find linked wishlists
+            const { data: links } = await supabase
+              .from('investment_portfolio_wishlists')
+              .select('wishlist_id')
+              .eq('portfolio_id', ports[0].id);
+
+            if (links && links.length > 0) {
+              // Patch the first linked wishlist_id
+              const { error: patchErr } = await supabase
+                .from('transactions')
+                .update({ wishlist_id: links[0].wishlist_id })
+                .eq('id', tx.id);
+              
+              if (!patchErr) {
+                patched = true;
+              }
+            }
+          }
+        }
+        if (patched) {
+          refresh();
+        }
+      } catch (e) {
+        console.error('Failed to patch legacy transactions', e);
+      }
+    }
+    
+    if (wishlists.length > 0 && transactions.length > 0) {
+      patchLegacyTransactions();
+    }
+  }, [wishlists, transactions]);
+
   useEffect(() => {
     wishlists.forEach(w => {
       const percent = (Number(w.current_amount) / Number(w.target_amount)) * 100;
@@ -104,6 +161,14 @@ export default function TabunganPage() {
         }
         if (t.from_account_id) {
           balances[t.from_account_id] = (balances[t.from_account_id] || 0) - Number(t.amount);
+        }
+      } else if (t.type === 'expense') {
+        if (t.from_account_id) {
+          balances[t.from_account_id] = (balances[t.from_account_id] || 0) - Number(t.amount);
+        }
+      } else if (t.type === 'income') {
+        if (t.to_account_id) {
+          balances[t.to_account_id] = (balances[t.to_account_id] || 0) + Number(t.amount);
         }
       }
     });
