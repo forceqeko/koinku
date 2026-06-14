@@ -21,7 +21,7 @@ export default function Topbar() {
 
   return (
     <header className="sticky top-0 z-30 bg-surface/80 backdrop-blur-md border-b border-line shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
-      <div className="h-[60px] max-w-[1100px] mx-auto px-4 md:px-6 flex items-center justify-start">
+      <div className="h-[60px] max-w-[1100px] mx-auto px-4 md:px-6 flex items-center justify-center md:justify-start">
         <h1 className="text-[16px] sm:text-[17px] font-bold text-text-primary">
           {getPageTitle()}
         </h1>

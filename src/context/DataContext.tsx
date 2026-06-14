@@ -11,7 +11,9 @@ import type {
   BillPurpose,
   InvestmentPortfolio,
   InvestmentPortfolioWishlist,
-  InvestmentReturn
+  InvestmentReturn,
+  Debt,
+  DebtPayment
 } from '../types';
 
 export interface DataContextType {
@@ -25,6 +27,8 @@ export interface DataContextType {
   portfolios: InvestmentPortfolio[];
   portfolioWishlists: InvestmentPortfolioWishlist[];
   investmentReturns: InvestmentReturn[];
+  debts: Debt[];
+  debtPayments: DebtPayment[];
   loading: boolean;
   refresh: () => Promise<void>;
 }
@@ -44,6 +48,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
     portfolios: InvestmentPortfolio[];
     portfolioWishlists: InvestmentPortfolioWishlist[];
     investmentReturns: InvestmentReturn[];
+    debts: Debt[];
+    debtPayments: DebtPayment[];
   }>({
     accounts: [],
     categories: [],
@@ -54,7 +60,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
     transactions: [],
     portfolios: [],
     portfolioWishlists: [],
-    investmentReturns: []
+    investmentReturns: [],
+    debts: [],
+    debtPayments: []
   });
   const [loading, setLoading] = useState(true);
 
@@ -132,6 +140,31 @@ export function DataProvider({ children }: { children: ReactNode }) {
         console.error('Failed to load investment tables. They might not exist yet.', err);
       }
 
+      // Fetch debt tables with error tolerance in case database schema is not updated yet
+      let debtsData: Debt[] = [];
+      let debtPaymentsData: DebtPayment[] = [];
+
+      try {
+        const [dbt, pmts] = await Promise.all([
+          supabase.from('debts').select('*').eq('user_id', user.id).order('created_at'),
+          supabase.from('debt_payments').select('*').eq('user_id', user.id).order('date', { ascending: false })
+        ]);
+        
+        if (!dbt.error) {
+          debtsData = dbt.data || [];
+        } else {
+          console.warn('debts fetch error: table might not exist yet.', dbt.error);
+        }
+        
+        if (!pmts.error) {
+          debtPaymentsData = pmts.data || [];
+        } else {
+          console.warn('debt_payments fetch error: table might not exist yet.', pmts.error);
+        }
+      } catch (err) {
+        console.error('Failed to load debt tables. They might not exist yet.', err);
+      }
+
       setData({
         accounts: sortedAccounts,
         categories: cat.data || [],
@@ -142,7 +175,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
         transactions: txn.data || [],
         portfolios: portfoliosData,
         portfolioWishlists: portfolioWishlistsData,
-        investmentReturns: investmentReturnsData
+        investmentReturns: investmentReturnsData,
+        debts: debtsData,
+        debtPayments: debtPaymentsData
       });
     } catch (err) {
       console.error('Failed to load data', err);
@@ -165,7 +200,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
         transactions: [],
         portfolios: [],
         portfolioWishlists: [],
-        investmentReturns: []
+        investmentReturns: [],
+        debts: [],
+        debtPayments: []
       });
       setLoading(false);
     }

@@ -88,6 +88,13 @@ BEGIN
     IF NOT FOUND THEN RAISE EXCEPTION 'Wishlist tidak ditemukan'; END IF;
   END IF;
 
+  -- Expense: decrease wishlist progress if linked
+  IF p_type = 'expense' AND p_wishlist IS NOT NULL THEN
+    UPDATE wishlists SET current_amount = current_amount - p_amt
+      WHERE id = p_wishlist AND user_id = uid;
+    IF NOT FOUND THEN RAISE EXCEPTION 'Wishlist tidak ditemukan'; END IF;
+  END IF;
+
   RETURN new_tx_id;
 END;
 $$;
@@ -155,6 +162,11 @@ BEGIN
       WHERE id = old_tx.wishlist_id AND user_id = uid;
   END IF;
 
+  IF old_tx.type = 'expense' AND old_tx.wishlist_id IS NOT NULL THEN
+    UPDATE wishlists SET current_amount = current_amount + old_amt
+      WHERE id = old_tx.wishlist_id AND user_id = uid;
+  END IF;
+
   -- Apply new data to the row. Fields not relevant to the new type are
   -- explicitly cleared so there are no leftovers from the old type.
   UPDATE transactions SET
@@ -195,6 +207,13 @@ BEGIN
 
   IF p_type = 'saving' AND p_wishlist IS NOT NULL THEN
     UPDATE wishlists SET current_amount = current_amount + p_amt
+      WHERE id = p_wishlist AND user_id = uid;
+    IF NOT FOUND THEN RAISE EXCEPTION 'Wishlist tidak ditemukan'; END IF;
+  END IF;
+
+  -- Expense: decrease wishlist progress if linked
+  IF p_type = 'expense' AND p_wishlist IS NOT NULL THEN
+    UPDATE wishlists SET current_amount = current_amount - p_amt
       WHERE id = p_wishlist AND user_id = uid;
     IF NOT FOUND THEN RAISE EXCEPTION 'Wishlist tidak ditemukan'; END IF;
   END IF;
@@ -246,6 +265,11 @@ BEGIN
 
   IF old_tx.type = 'saving' AND old_tx.wishlist_id IS NOT NULL THEN
     UPDATE wishlists SET current_amount = current_amount - old_amt
+      WHERE id = old_tx.wishlist_id AND user_id = uid;
+  END IF;
+
+  IF old_tx.type = 'expense' AND old_tx.wishlist_id IS NOT NULL THEN
+    UPDATE wishlists SET current_amount = current_amount + old_amt
       WHERE id = old_tx.wishlist_id AND user_id = uid;
   END IF;
 

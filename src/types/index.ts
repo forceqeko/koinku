@@ -168,6 +168,44 @@ export interface TransactionWithRelations extends Transaction {
 // ============================================
 // DATA CONTEXT STATE
 // ============================================
+// DEBT ENTITY
+// ============================================
+
+export interface Debt extends BaseEntity {
+  name: string;
+  type: 'hutang' | 'piutang';
+  counterparty: string;
+  principal_amount: number;
+  interest_rate: number; // persen per bulan (flat)
+  tenor_months?: number | null; // tenor dalam bulan
+  start_date: string;
+  due_date?: string | null;
+  notes?: string | null;
+  is_settled: boolean;
+  settled_at?: string | null;
+  account_id?: string | null;      // Wallet terkait dana awal
+  transaction_id?: string | null;  // Pemasukan/pengeluaran awal
+}
+
+// ============================================
+// DEBT PAYMENT ENTITY
+// ============================================
+
+export interface DebtPayment {
+  id: string;
+  user_id: string;
+  debt_id: string;
+  amount: number;
+  date: string;
+  notes?: string | null;
+  account_id?: string | null;     // Wallet sumber/tujuan cicilan
+  transaction_id?: string | null; // Transaksi pengeluaran/pemasukan cicilan
+  created_at?: string;
+}
+
+// ============================================
+// DATA CONTEXT STATE
+// ============================================
 
 export interface DataState {
   accounts: Account[];
@@ -179,7 +217,10 @@ export interface DataState {
   portfolios: InvestmentPortfolio[];
   portfolioWishlists: InvestmentPortfolioWishlist[];
   investmentReturns: InvestmentReturn[];
+  debts: Debt[];
+  debtPayments: DebtPayment[];
 }
+
 
 // ============================================
 // VALIDATION HELPERS (Point 14: Server-side validation helpers)

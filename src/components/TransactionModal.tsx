@@ -157,7 +157,7 @@ function ItemTrigger({ items, value, onClick, label, placeholder = "Pilih..." }:
 }
 
 export default function TransactionModal({ isOpen, onClose, onAdd, onEdit, onDelete, type, initialData }: TransactionModalProps) {
-  const { accounts, categories, sources, wishlists, purposes, billPurposes } = useData();
+  const { accounts, categories, sources, wishlists, transactions, purposes, billPurposes } = useData();
 
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
@@ -171,11 +171,45 @@ export default function TransactionModal({ isOpen, onClose, onAdd, onEdit, onDel
   const [incomeSourceId, setIncomeSourceId] = useState('');
   const [wishlistId, setWishlistId] = useState('');
   const [billPurposeId, setBillPurposeId] = useState('');
+  const [linkedWishlistId, setLinkedWishlistId] = useState('');
 
-  const [pickerMode, setPickerMode] = useState<'none' | 'from' | 'to' | 'category' | 'source' | 'wishlist' | 'purpose' | 'billpurpose'>('none');
+  const [pickerMode, setPickerMode] = useState<'none' | 'from' | 'to' | 'category' | 'source' | 'wishlist' | 'purpose' | 'billpurpose' | 'linkedwishlist'>('none');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const isEditMode = !!initialData;
+
+  const getAvailableWishlistsForAccount = (accountId: string) => {
+    if (!accountId) return [];
+    const activeWishlists = wishlists.filter(w => !w.is_closed);
+    return activeWishlists.filter(w => {
+      if (initialData && initialData.wishlist_id === w.id) {
+        return true;
+      }
+      let balance = 0;
+      const wishlistTx = (transactions || []).filter(t => t.wishlist_id === w.id && !t.deleted_at);
+      wishlistTx.forEach(t => {
+        if (initialData && t.id === initialData.id) {
+          return;
+        }
+        const amt = Number(t.amount);
+        if (t.type === 'saving' && t.to_account_id === accountId) {
+          balance += amt;
+        } else if (t.type === 'transfer') {
+          if (t.to_account_id === accountId) {
+            balance += amt;
+          }
+          if (t.from_account_id === accountId) {
+            balance -= amt;
+          }
+        } else if (t.type === 'expense' && t.from_account_id === accountId) {
+          balance -= amt;
+        } else if (t.type === 'income' && t.to_account_id === accountId) {
+          balance += amt;
+        }
+      });
+      return balance > 0;
+    });
+  };
 
   // Pre-fill form when opening
   useEffect(() => {
@@ -193,6 +227,7 @@ export default function TransactionModal({ isOpen, onClose, onAdd, onEdit, onDel
         setIncomeSourceId(initialData.source_id || sources[0]?.id || '');
         setWishlistId(initialData.wishlist_id || wishlists[0]?.id || '');
         setBillPurposeId(initialData.bill_purpose_id || billPurposes[0]?.id || '');
+        setLinkedWishlistId(initialData.wishlist_id || '');
       } else {
         setDescription('');
         setAmount('');
@@ -205,9 +240,10 @@ export default function TransactionModal({ isOpen, onClose, onAdd, onEdit, onDel
         setIncomeSourceId(sources[0]?.id || '');
         setWishlistId(wishlists[0]?.id || '');
         setBillPurposeId(billPurposes[0]?.id || '');
+        setLinkedWishlistId('');
       }
     }
-  }, [isOpen, initialData, accounts, categories, sources, wishlists, purposes, billPurposes]);
+  }, [isOpen, initialData, accounts, categories, sources, wishlists, transactions, purposes, billPurposes]);
 
   if (!isOpen) return null;
 
@@ -227,10 +263,12 @@ export default function TransactionModal({ isOpen, onClose, onAdd, onEdit, onDel
       txData.from_account_id = fromAccountId;
       txData.category_id = expenseCategoryId;
       txData.purpose_id = expensePurposeId;
+      txData.wishlist_id = linkedWishlistId || null;
     } else if (type === 'transfer') {
       txData.from_account_id = fromAccountId;
       txData.to_account_id = toAccountId;
       txData.admin_fee = adminFee ? Number(parseThousands(adminFee)) : 0;
+      txData.wishlist_id = linkedWishlistId || null;
     } else if (type === 'saving') {
       txData.from_account_id = fromAccountId;
       txData.to_account_id = toAccountId;
@@ -321,23 +359,42 @@ export default function TransactionModal({ isOpen, onClose, onAdd, onEdit, onDel
               />
             )}
 
+            {type === 'transfer' && (
+              <ItemTrigger 
+                label="Tabungan Terkait (Opsional)"
+                items={wishlists}
+                value={linkedWishlistId}
+                onClick={() => setPickerMode('linkedwishlist')}
+                placeholder="Pilih tabungan (opsional)"
+              />
+            )}
+
             {type === 'expense' && (
-              <div className="grid grid-cols-2 gap-4">
+              <>
+                <div className="grid grid-cols-2 gap-4">
+                  <ItemTrigger 
+                    label="Kategori"
+                    items={categories}
+                    value={expenseCategoryId}
+                    onClick={() => setPickerMode('category')}
+                    placeholder="Pilih Kategori"
+                  />
+                  <ItemTrigger 
+                    label="Tujuan"
+                    items={purposes}
+                    value={expensePurposeId}
+                    onClick={() => setPickerMode('purpose')}
+                    placeholder="Pilih Tujuan"
+                  />
+                </div>
                 <ItemTrigger 
-                  label="Kategori"
-                  items={categories}
-                  value={expenseCategoryId}
-                  onClick={() => setPickerMode('category')}
-                  placeholder="Pilih Kategori"
+                  label="Tabungan Terkait (Opsional)"
+                  items={wishlists}
+                  value={linkedWishlistId}
+                  onClick={() => setPickerMode('linkedwishlist')}
+                  placeholder="Pilih tabungan (opsional)"
                 />
-                <ItemTrigger 
-                  label="Tujuan"
-                  items={purposes}
-                  value={expensePurposeId}
-                  onClick={() => setPickerMode('purpose')}
-                  placeholder="Pilih Tujuan"
-                />
-              </div>
+              </>
             )}
             
             {type === 'income' && (
@@ -399,6 +456,7 @@ export default function TransactionModal({ isOpen, onClose, onAdd, onEdit, onDel
           pickerMode === 'purpose' ? 'Pilih Tujuan Pengeluaran' :
           pickerMode === 'source' ? 'Pilih Sumber Pemasukan' :
           pickerMode === 'billpurpose' ? 'Pilih Tujuan Tagihan' :
+          pickerMode === 'linkedwishlist' ? 'Pilih Tabungan Terkait' :
           'Pilih Wishlist'
         }
         items={
@@ -407,6 +465,10 @@ export default function TransactionModal({ isOpen, onClose, onAdd, onEdit, onDel
           pickerMode === 'purpose' ? purposes :
           pickerMode === 'source' ? sources :
           pickerMode === 'billpurpose' ? billPurposes :
+          pickerMode === 'linkedwishlist' ? [
+            { id: '', name: 'Tidak Ada (Bukan Tabungan)' },
+            ...getAvailableWishlistsForAccount(fromAccountId)
+          ] :
           wishlists
         }
         selectedValue={
@@ -416,15 +478,20 @@ export default function TransactionModal({ isOpen, onClose, onAdd, onEdit, onDel
           pickerMode === 'purpose' ? expensePurposeId :
           pickerMode === 'source' ? incomeSourceId :
           pickerMode === 'billpurpose' ? billPurposeId :
+          pickerMode === 'linkedwishlist' ? linkedWishlistId :
           wishlistId
         }
         onSelect={(id) => {
-          if (pickerMode === 'from') setFromAccountId(id);
+          if (pickerMode === 'from') {
+            setFromAccountId(id);
+            setLinkedWishlistId('');
+          }
           else if (pickerMode === 'to') setToAccountId(id);
           else if (pickerMode === 'category') setExpenseCategoryId(id);
           else if (pickerMode === 'purpose') setExpensePurposeId(id);
           else if (pickerMode === 'source') setIncomeSourceId(id);
           else if (pickerMode === 'billpurpose') setBillPurposeId(id);
+          else if (pickerMode === 'linkedwishlist') setLinkedWishlistId(id);
           else setWishlistId(id);
         }}
         placeholder={
@@ -433,6 +500,7 @@ export default function TransactionModal({ isOpen, onClose, onAdd, onEdit, onDel
           pickerMode === 'purpose' ? "Cari tujuan..." :
           pickerMode === 'source' ? "Cari sumber..." :
           pickerMode === 'billpurpose' ? "Cari tagihan..." :
+          pickerMode === 'linkedwishlist' ? "Cari tabungan..." :
           "Cari wishlist..."
         }
       />
