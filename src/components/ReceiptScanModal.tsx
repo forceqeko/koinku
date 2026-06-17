@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { 
-  X, ChevronDown, Check, Building2, Smartphone, Wallet, 
-  Search, Upload, Camera, Loader2, AlertCircle, Sparkles, CheckCircle2 
+import {
+  X, ChevronDown, Check, Building2, Smartphone, Wallet,
+  Search, Upload, Camera, Loader2, AlertCircle, Sparkles, CheckCircle2
 } from 'lucide-react';
 import { analyzeReceipt, ReceiptScanResult } from '../lib/gemini';
 import { formatThousands, parseThousands } from '../lib/utils';
@@ -46,7 +46,7 @@ function ItemPicker({ isOpen, onClose, items, onSelect, selectedValue, title, pl
 
   if (!isOpen) return null;
 
-  const filteredItems = items.filter(a => 
+  const filteredItems = items.filter(a =>
     (a.name || '').toLowerCase().includes(search.toLowerCase()) ||
     (a.type || '').toLowerCase().includes(search.toLowerCase())
   );
@@ -66,10 +66,10 @@ function ItemPicker({ isOpen, onClose, items, onSelect, selectedValue, title, pl
         <div className="p-4 border-b border-line bg-surface">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
-            <input 
+            <input
               ref={inputRef}
-              type="text" 
-              placeholder={placeholder} 
+              type="text"
+              placeholder={placeholder}
               value={search}
               onChange={e => setSearch(e.target.value)}
               className="w-full bg-surface-alt/50 border border-line rounded-xl pl-10 pr-4 py-2.5 text-[13px] focus:border-accent focus:ring-1 focus:ring-accent/20 outline-none transition-all"
@@ -137,18 +137,18 @@ function ItemTrigger({ items, value, onClick, label, placeholder = "Pilih..." }:
   return (
     <div className="space-y-1 text-left">
       <label className="block text-[11px] font-medium text-text-secondary">{label}</label>
-      <button 
-        type="button" 
-        onClick={onClick} 
+      <button
+        type="button"
+        onClick={onClick}
         className="input flex items-center justify-between w-full hover:border-accent/40 bg-surface text-left group transition-all h-[42px] px-3.5 rounded-xl border border-line"
       >
         {selected ? (
           <div className="flex items-center gap-2">
             <div className="w-6 h-6 rounded bg-white border border-line flex items-center justify-center overflow-hidden shrink-0">
               {selected.icon_url ? (
-                 <img src={selected.icon_url} alt={selected.name} className="w-4.5 h-4.5 object-contain" />
+                <img src={selected.icon_url} alt={selected.name} className="w-4.5 h-4.5 object-contain" />
               ) : (
-                 <SelectedIcon className="w-3.5 h-3.5 text-text-muted" />
+                <SelectedIcon className="w-3.5 h-3.5 text-text-muted" />
               )}
             </div>
             <span className="font-semibold text-text-primary text-[12px] truncate max-w-[110px]">{selected.name}</span>
@@ -182,31 +182,31 @@ export default function ReceiptScanModal({
 }: ReceiptScanModalProps) {
   // Modal stages: 'upload' | 'analyzing' | 'preview'
   const [stage, setStage] = useState<'upload' | 'analyzing' | 'preview'>('upload');
-  
+
   // Image states
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   const [imageBase64, setImageBase64] = useState<string>('');
   const [mimeType, setMimeType] = useState<string>('image/jpeg');
-  
+
   // Global form fields for confirmation stage
   const [storeName, setStoreName] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [fromAccountId, setFromAccountId] = useState('');
-  
+
   // Dynamic item checklist and selected indexes
   const [localItems, setLocalItems] = useState<LocalReceiptItem[]>([]);
   const [activeItemIndex, setActiveItemIndex] = useState<number | null>(null);
-  
+
   // Loading and sequence states
   const [scanResult, setScanResult] = useState<ReceiptScanResult | null>(null);
   const [loadingStep, setLoadingStep] = useState('Mengunggah gambar struk...');
   const [isSaving, setIsSaving] = useState(false);
   const [savingProgress, setSavingProgress] = useState('');
-  
+
   // Selection trigger drawer/picker modes
   const [pickerMode, setPickerMode] = useState<'none' | 'from' | 'category' | 'purpose'>('none');
   const [isDragOver, setIsDragOver] = useState(false);
-  
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
@@ -321,7 +321,7 @@ export default function ReceiptScanModal({
           c => c.name.toLowerCase() === (it.suggested_category || '').toLowerCase()
         );
         const categoryId = matchedCategory ? matchedCategory.id : (categories[0]?.id || '');
-        
+
         let purposeId = '';
         if (categoryId) {
           const matchedPurpose = purposes.find(
@@ -361,7 +361,7 @@ export default function ReceiptScanModal({
   // Perform sequential database insertions
   const handleSaveTransactions = async () => {
     const activeItems = localItems.filter(item => item.checked);
-    
+
     if (activeItems.length === 0) {
       toast.error('Silakan centang setidaknya satu barang untuk disimpan.');
       return;
@@ -403,7 +403,7 @@ export default function ReceiptScanModal({
       for (let i = 0; i < activeItems.length; i++) {
         const item = activeItems[i];
         setSavingProgress(`Menyimpan barang ke-${i + 1} dari ${activeItems.length}:\n"${item.name}"`);
-        
+
         const payload = {
           date: new Date(date).toISOString(),
           type: 'expense',
@@ -471,7 +471,7 @@ export default function ReceiptScanModal({
   const totalAmount = localItems
     .filter(item => item.checked)
     .reduce((sum, item) => sum + (Number(parseThousands(item.amount)) || 0), 0);
-  
+
   const checkedCount = localItems.filter(item => item.checked).length;
 
   return createPortal(
@@ -483,7 +483,7 @@ export default function ReceiptScanModal({
             <div className="flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-accent animate-pulse" />
               <h2 className="text-[15px] font-bold text-text-primary">
-                Scan Struk AI (Pecah Item)
+                Scan Struk AI
               </h2>
             </div>
             <button onClick={onClose} aria-label="Tutup modal" className="p-1.5 text-text-muted hover:text-text-primary hover:bg-surface-hover rounded-lg transition-all">
@@ -492,12 +492,12 @@ export default function ReceiptScanModal({
           </div>
 
           <div className="flex-1 overflow-y-auto custom-scrollbar p-5 md:p-6 space-y-5">
-            
+
             {/* STAGE 1: UPLOAD / CAMERA VIEW */}
             {stage === 'upload' && (
               <div className="space-y-6">
                 {!imagePreviewUrl ? (
-                  <div 
+                  <div
                     onDragOver={handleDragOver}
                     onDragLeave={handleDragLeave}
                     onDrop={handleDrop}
@@ -512,27 +512,27 @@ export default function ReceiptScanModal({
                     </div>
                     <p className="text-[13px] font-bold text-text-primary mb-1">Pilih atau Seret Foto Struk</p>
                     <p className="text-[11px] text-text-muted max-w-[240px]">Mendukung format PNG, JPG, atau WEBP dari galeri ponsel atau komputer Anda</p>
-                    
-                    <input 
-                      ref={fileInputRef} 
-                      type="file" 
-                      accept="image/*" 
-                      onChange={handleFileChange} 
-                      className="hidden" 
+
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFileChange}
+                      className="hidden"
                     />
                   </div>
                 ) : (
                   <div className="space-y-4">
                     <div className="relative rounded-2xl border border-line overflow-hidden aspect-[4/3] bg-black/10 flex items-center justify-center">
                       <img src={imagePreviewUrl} alt="Preview Struk" className="max-w-full max-h-full object-contain" />
-                      <button 
+                      <button
                         onClick={() => { setImagePreviewUrl(null); setImageBase64(''); }}
                         className="absolute top-3 right-3 p-1.5 bg-black/60 hover:bg-black/80 backdrop-blur-md rounded-full text-white transition-all shadow-md"
                       >
                         <X className="w-4 h-4" />
                       </button>
                     </div>
-                    
+
                     <button
                       onClick={handleStartAnalysis}
                       className="btn btn-primary w-full py-3 text-[13px] font-bold shadow-lg shadow-accent/20 flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
@@ -549,20 +549,20 @@ export default function ReceiptScanModal({
                   <div className="h-px bg-line flex-1" />
                 </div>
 
-                <button 
+                <button
                   onClick={() => cameraInputRef.current?.click()}
                   className="w-full py-3 border border-line bg-surface hover:border-accent/40 text-text-primary font-bold rounded-2xl flex items-center justify-center gap-2.5 text-[13px] transition-all active:scale-[0.98]"
                 >
                   <Camera className="w-4.5 h-4.5 text-accent" />
                   Gunakan Kamera
                 </button>
-                <input 
-                  ref={cameraInputRef} 
-                  type="file" 
-                  accept="image/*" 
-                  capture="environment" 
-                  onChange={handleFileChange} 
-                  className="hidden" 
+                <input
+                  ref={cameraInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={handleFileChange}
+                  className="hidden"
                 />
               </div>
             )}
@@ -576,7 +576,7 @@ export default function ReceiptScanModal({
                   </div>
                   <div className="absolute inset-0 w-16 h-16 rounded-full border border-accent/40 scale-110 animate-ping opacity-40" />
                 </div>
-                
+
                 <div className="space-y-2">
                   <h4 className="text-[14px] font-bold text-text-primary">Menganalisis Struk via Google AI</h4>
                   <p className="text-[11px] text-text-muted font-medium animate-pulse">{loadingStep}</p>
@@ -598,12 +598,12 @@ export default function ReceiptScanModal({
             {/* STAGE 3: INTERACTIVE MULTI-ITEM PREVIEW FORM */}
             {stage === 'preview' && scanResult && (
               <div className="space-y-5 text-left">
-                
+
                 {/* Accuracy Status */}
                 <div className="flex items-center justify-between bg-surface-alt/20 border border-line rounded-xl px-4 py-2.5">
                   <div className="flex items-center gap-2">
                     <CheckCircle2 className="w-4 h-4 text-success" />
-                    <span className="text-[11px] font-bold text-text-primary">Ekstraksi Sukses (Pecah Item)</span>
+                    <span className="text-[11px] font-bold text-text-primary">Ekstraksi Sukses</span>
                   </div>
                   {confidenceBadge(scanResult.confidence)}
                 </div>
@@ -620,34 +620,34 @@ export default function ReceiptScanModal({
                 {/* GLOBAL CONTROLS (Toko, Dompet, Tanggal) */}
                 <div className="bg-surface-alt/20 border border-line rounded-2xl p-4 space-y-4">
                   <h4 className="text-[12px] font-bold text-accent uppercase tracking-wider">Pengaturan Global</h4>
-                  
+
                   <div>
                     <label className="block text-[11px] font-medium text-text-secondary mb-1">Nama Toko / Merchant</label>
-                    <input 
-                      type="text" 
-                      required 
-                      value={storeName} 
-                      onChange={e => setStoreName(e.target.value)} 
-                      className="input h-[42px] text-[13px] rounded-xl border border-line bg-surface" 
-                      placeholder="Contoh: Alfamart / Indomaret" 
+                    <input
+                      type="text"
+                      required
+                      value={storeName}
+                      onChange={e => setStoreName(e.target.value)}
+                      className="input h-[42px] text-[13px] rounded-xl border border-line bg-surface"
+                      placeholder="Contoh: Alfamart / Indomaret"
                     />
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
-                    <ItemTrigger 
+                    <ItemTrigger
                       label="Sumber Dompet / Wallet"
-                      items={accounts} 
-                      value={fromAccountId} 
-                      onClick={() => setPickerMode('from')} 
+                      items={accounts}
+                      value={fromAccountId}
+                      onClick={() => setPickerMode('from')}
                     />
                     <div>
                       <label className="block text-[11px] font-medium text-text-secondary mb-1">Tanggal Transaksi</label>
-                      <input 
-                        type="date" 
-                        required 
-                        value={date} 
-                        onChange={e => setDate(e.target.value)} 
-                        className="input h-[42px] text-[13px] rounded-xl border border-line bg-surface" 
+                      <input
+                        type="date"
+                        required
+                        value={date}
+                        onChange={e => setDate(e.target.value)}
+                        className="input h-[42px] text-[13px] rounded-xl border border-line bg-surface"
                       />
                     </div>
                   </div>
@@ -656,15 +656,15 @@ export default function ReceiptScanModal({
                 {/* MULTI-ITEM CHECKLIST GRID */}
                 <div className="space-y-3">
                   <h4 className="text-[12px] font-bold text-text-muted uppercase tracking-wider px-1">Daftar Barang ({localItems.length})</h4>
-                  
+
                   <div className="space-y-3.5 max-h-[340px] overflow-y-auto custom-scrollbar pr-1.5">
                     {localItems.map((item, idx) => (
-                      <div 
-                        key={idx} 
+                      <div
+                        key={idx}
                         className={clsx(
                           "border rounded-2xl p-3.5 transition-all relative flex flex-col md:flex-row gap-3.5 items-start",
-                          item.checked 
-                            ? "bg-surface border-line" 
+                          item.checked
+                            ? "bg-surface border-line"
                             : "bg-surface-alt/10 border-transparent opacity-50"
                         )}
                       >
@@ -674,8 +674,8 @@ export default function ReceiptScanModal({
                           onClick={() => toggleItemCheck(idx)}
                           className={clsx(
                             "w-5.5 h-5.5 rounded-lg border flex items-center justify-center transition-all shrink-0 mt-1 md:mt-2",
-                            item.checked 
-                              ? "bg-accent border-accent text-white" 
+                            item.checked
+                              ? "bg-accent border-accent text-white"
                               : "border-line bg-surface text-transparent hover:border-accent/60"
                           )}
                         >
@@ -686,7 +686,7 @@ export default function ReceiptScanModal({
                         <div className="flex-1 w-full space-y-3">
                           {/* Name & Total price row */}
                           <div className="flex flex-col sm:flex-row gap-2.5 sm:items-center justify-between">
-                            <input 
+                            <input
                               type="text"
                               value={item.name}
                               disabled={!item.checked}
@@ -694,10 +694,10 @@ export default function ReceiptScanModal({
                               className="bg-transparent font-bold text-text-primary text-[13px] border-b border-transparent focus:border-accent/40 outline-none w-full sm:max-w-[240px] truncate"
                               placeholder="Nama Barang"
                             />
-                            
+
                             <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-auto">
                               <span className="text-[11px] text-text-muted">Rp</span>
-                              <input 
+                              <input
                                 type="text"
                                 inputMode="numeric"
                                 disabled={!item.checked}
@@ -757,15 +757,15 @@ export default function ReceiptScanModal({
                   </div>
 
                   <div className="space-y-2.5">
-                    <button 
-                      onClick={handleSaveTransactions} 
+                    <button
+                      onClick={handleSaveTransactions}
                       className="btn btn-primary w-full py-3 text-[14px] font-bold shadow-lg shadow-accent/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
                     >
                       Simpan {checkedCount} Transaksi
                     </button>
 
-                    <button 
-                      onClick={resetAll} 
+                    <button
+                      onClick={resetAll}
                       className="w-full py-2.5 border border-line bg-surface hover:bg-surface-hover hover:border-accent/40 rounded-xl font-bold text-text-secondary text-[12px] transition-all active:scale-[0.98]"
                     >
                       Scan Ulang
@@ -796,32 +796,32 @@ export default function ReceiptScanModal({
       )}
 
       {/* Dynamic Selector Drawer/Picker */}
-      <ItemPicker 
+      <ItemPicker
         isOpen={pickerMode !== 'none'}
         onClose={() => setPickerMode('none')}
         title={
           pickerMode === 'from' ? 'Pilih Dompet / Wallet' :
-          pickerMode === 'category' ? 'Pilih Kategori' :
-          'Pilih Tujuan Pengeluaran'
+            pickerMode === 'category' ? 'Pilih Kategori' :
+              'Pilih Tujuan Pengeluaran'
         }
         items={
           pickerMode === 'from' ? accounts :
-          pickerMode === 'category' ? categories :
-          // Filter purposes dynamically: show global purposes or those matching the item's selected category
-          purposes.filter(
-            p => {
-              if (activeItemIndex !== null) {
-                const itemCatId = localItems[activeItemIndex]?.category_id;
-                return !p.category_id || !itemCatId || p.category_id === itemCatId;
-              }
-              return true;
-            }
-          )
+            pickerMode === 'category' ? categories :
+              // Filter purposes dynamically: show global purposes or those matching the item's selected category
+              purposes.filter(
+                p => {
+                  if (activeItemIndex !== null) {
+                    const itemCatId = localItems[activeItemIndex]?.category_id;
+                    return !p.category_id || !itemCatId || p.category_id === itemCatId;
+                  }
+                  return true;
+                }
+              )
         }
         selectedValue={
           pickerMode === 'from' ? fromAccountId :
-          pickerMode === 'category' ? (activeItemIndex !== null ? localItems[activeItemIndex].category_id : '') :
-          (activeItemIndex !== null ? localItems[activeItemIndex].purpose_id : '')
+            pickerMode === 'category' ? (activeItemIndex !== null ? localItems[activeItemIndex].category_id : '') :
+              (activeItemIndex !== null ? localItems[activeItemIndex].purpose_id : '')
         }
         onSelect={(id) => {
           if (pickerMode === 'from') {
@@ -851,8 +851,8 @@ export default function ReceiptScanModal({
         }}
         placeholder={
           pickerMode === 'from' ? "Cari nama akun..." :
-          pickerMode === 'category' ? "Cari kategori..." :
-          "Cari tujuan..."
+            pickerMode === 'category' ? "Cari kategori..." :
+              "Cari tujuan..."
         }
       />
     </>,

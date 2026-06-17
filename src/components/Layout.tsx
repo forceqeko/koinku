@@ -3,15 +3,17 @@ import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import Sidebar, { navItems } from './Sidebar';
 import Topbar from './Topbar';
 import TransactionModal from './TransactionModal';
+import ReceiptScanModal from './ReceiptScanModal';
 import { useData } from '../context/DataContext';
 import { supabase } from '../lib/supabase';
 import { toast } from './Toast';
 import clsx from 'clsx';
-import { Plus } from '@phosphor-icons/react';
+import { Scan } from 'lucide-react';
 
 export default function Layout() {
   const [quickAddOpen, setQuickAddOpen] = useState(false);
-  const { refresh } = useData();
+  const [scanOpen, setScanOpen] = useState(false);
+  const { accounts, categories, purposes, refresh } = useData();
   const location = useLocation();
 
   const handleQuickAdd = async (txData: Record<string, unknown>) => {
@@ -31,6 +33,14 @@ export default function Layout() {
     } catch (err: any) {
       toast.error('Gagal: ' + err.message);
     }
+  };
+
+  const handleScanAdd = async (txData: Record<string, unknown>) => {
+    const { error } = await supabase.rpc('create_transaction_atomic', {
+      payload: txData,
+    });
+    if (error) throw error;
+    await refresh();
   };
 
   return (
@@ -70,11 +80,11 @@ export default function Layout() {
 
         <div className="relative -top-5 flex justify-center w-[60px]">
           <button
-            onClick={() => setQuickAddOpen(true)}
-            aria-label="Tambah transaksi baru"
+            onClick={() => setScanOpen(true)}
+            aria-label="Scan struk belanja"
             className="w-[52px] h-[52px] bg-accent hover:bg-accent-hover text-bg rounded-full shadow-lg shadow-accent/20 dark:shadow-none flex items-center justify-center active:scale-95 transition-transform border-[3px] border-surface"
           >
-            <Plus size={24} weight="bold" />
+            <Scan size={24} />
           </button>
         </div>
 
@@ -100,6 +110,15 @@ export default function Layout() {
         onClose={() => setQuickAddOpen(false)}
         onAdd={handleQuickAdd}
         type="expense"
+      />
+
+      <ReceiptScanModal
+        isOpen={scanOpen}
+        onClose={() => setScanOpen(false)}
+        onAddTransaction={handleScanAdd}
+        accounts={accounts}
+        categories={categories}
+        purposes={purposes}
       />
     </div>
   );
