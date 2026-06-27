@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import TransactionModal from '../components/TransactionModal';
 import ReceiptScanModal from '../components/ReceiptScanModal';
-import { Plus, ChevronDown, ArrowUp, ArrowDown, ArrowUpDown, Calendar, Search, ScanLine } from 'lucide-react';
+import { Plus, ChevronDown, ArrowUp, ArrowDown, ArrowUpDown, Calendar, Search, ScanLine, ArrowDownLeft, ArrowUpRight, ArrowLeftRight, FileText, PiggyBank, Wallet } from 'lucide-react';
 import clsx from 'clsx';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
@@ -522,63 +522,108 @@ export default function Transactions() {
                   const purpose = purposes.find((p: ExpensePurpose) => p.id === tx.purpose_id);
                   const billPurpose = billPurposes.find((b: any) => b.id === tx.bill_purpose_id);
 
-                  return (
-                    <div 
-                      key={tx.id} 
-                      onClick={() => openEditModal(tx.original_tx || tx)} 
-                      className="card p-4 shadow-sm border-line bg-surface active:bg-surface-hover transition-colors cursor-pointer"
-                    >
-                      <div className="flex justify-between items-start mb-2">
-                        <div className="flex-1 min-w-0 mr-3">
-                          <p className="text-[13px] font-bold text-text-primary truncate">
-                            {activeTab === 'saving' ? (wishlist?.name || tx.description) : tx.description}
-                          </p>
-                          <p className="text-[11px] text-text-muted font-medium mt-0.5">
-                            {format(new Date(tx.date), 'dd MMM yyyy', { locale: id })}
-                          </p>
+                  return (() => {
+                    // Determine main icon and background colors based on transaction type
+                    let MainIcon = ArrowUpRight;
+                    let iconBg = 'bg-danger/10 border-danger/20 text-danger';
+                    let sign = '-';
+                    let amountColor = 'text-text-primary';
+
+                    if (tx.type === 'income') {
+                      MainIcon = ArrowDownLeft;
+                      iconBg = 'bg-success/10 border-success/20 text-success';
+                      sign = '+';
+                      amountColor = 'text-success';
+                    } else if (tx.type === 'bill') {
+                      MainIcon = FileText;
+                      iconBg = 'bg-warning/10 border-warning/20 text-warning';
+                    } else if (tx.type === 'transfer') {
+                      MainIcon = ArrowLeftRight;
+                      iconBg = 'bg-primary/10 border-primary/20 text-primary';
+                      sign = '';
+                    } else if (tx.type === 'saving') {
+                      MainIcon = PiggyBank;
+                      iconBg = 'bg-accent/10 border-accent/20 text-accent';
+                      sign = '';
+                    } else if (tx.type === 'expense') {
+                      if (purpose && purpose.icon) {
+                        MainIcon = getPurposeIcon(purpose.icon);
+                        iconBg = 'bg-accent/10 border border-accent/20 text-accent';
+                      } else {
+                        MainIcon = ArrowUpRight;
+                        iconBg = 'bg-danger/10 border border-danger/20 text-danger';
+                      }
+                    }
+
+                    return (
+                      <div 
+                        key={tx.id} 
+                        onClick={() => openEditModal(tx.original_tx || tx)} 
+                        className="card p-3.5 shadow-sm border border-line bg-surface active:bg-surface-hover transition-colors cursor-pointer"
+                      >
+                        <div className="flex items-center gap-3.5">
+                          {/* Circular Large Icon Box */}
+                          <div className={clsx("w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 border", iconBg)}>
+                            <MainIcon className="w-5 h-5 shrink-0" />
+                          </div>
+
+                          {/* Info Column */}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[13px] font-bold text-text-primary truncate">
+                              {activeTab === 'saving' ? (wishlist?.name || tx.description) : tx.description}
+                            </p>
+                            
+                            <div className="text-[11px] font-semibold text-text-muted mt-1 flex items-center gap-1.5 truncate">
+                              {/* Wallet/Account logo if exists */}
+                              <div className="flex items-center gap-1 shrink-0">
+                                {fromAcct?.icon_url ? (
+                                  <img src={fromAcct.icon_url} alt="" className="w-4 h-4 rounded-md object-contain border border-line bg-white shrink-0" />
+                                ) : (
+                                  <Wallet className="w-3.5 h-3.5 text-text-muted shrink-0" />
+                                )}
+                                <span className="text-text-muted font-bold truncate max-w-[70px]">
+                                  {fromAcct?.name || '-'}
+                                </span>
+                              </div>
+
+                              {toAcct && (
+                                <span className="text-text-muted/60 shrink-0">➔</span>
+                              )}
+
+                              {toAcct && (
+                                <div className="flex items-center gap-1 shrink-0">
+                                  {toAcct.icon_url ? (
+                                    <img src={toAcct.icon_url} alt="" className="w-4 h-4 rounded-md object-contain border border-line bg-white shrink-0" />
+                                  ) : (
+                                    <Wallet className="w-3.5 h-3.5 text-text-muted shrink-0" />
+                                  )}
+                                  <span className="text-text-muted font-bold truncate max-w-[70px]">
+                                    {toAcct.name}
+                                  </span>
+                                </div>
+                              )}
+
+                              <span className="text-text-muted/40 shrink-0">•</span>
+
+                              <span className="bg-surface-alt/70 px-1.5 py-0.5 rounded-md text-[9px] font-bold text-text-secondary border border-line/50 shrink-0 uppercase tracking-wider">
+                                {category?.name || billPurpose?.name || (tx.type === 'transfer' ? 'Transfer' : tx.type === 'saving' ? 'Tabungan' : 'Lainnya')}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Amount and Date Column */}
+                          <div className="text-right shrink-0">
+                            <p className={clsx("text-[14px] font-extrabold whitespace-nowrap", amountColor)}>
+                              {sign}{fmt(Number(tx.amount))}
+                            </p>
+                            <p className="text-[10px] text-text-muted font-bold mt-1.5">
+                              {format(new Date(tx.date), 'dd MMM yyyy', { locale: id })}
+                            </p>
+                          </div>
                         </div>
-                        <span className={clsx("text-[14px] font-bold whitespace-nowrap", activeTab === 'income' ? "text-success" : "text-text-primary")}>
-                          {activeTab === 'income' ? '+' : activeTab === 'expense' || activeTab === 'bill' ? '-' : ''}{fmt(Number(tx.amount))}
-                        </span>
                       </div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {activeTab === 'expense' && category && (
-                          <span className="bg-surface-alt/50 px-2 py-0.5 rounded-md text-text-secondary font-medium border border-line/50 text-[10px]">
-                            {category.name}
-                          </span>
-                        )}
-                        {activeTab === 'expense' && purpose && (() => {
-                          const IconComp = getPurposeIcon(purpose.icon);
-                          return (
-                            <span className="inline-flex items-center gap-1 bg-accent/5 px-2 py-0.5 rounded-md text-accent font-semibold border border-accent/10 text-[10px]">
-                              <IconComp className="w-3 h-3 shrink-0" />
-                              <span>{purpose.name}</span>
-                            </span>
-                          );
-                        })()}
-                        {activeTab === 'bill' && billPurpose && (
-                          <span className="bg-warning/10 px-2 py-0.5 rounded-md text-warning font-semibold border border-warning/20 text-[10px]">
-                            {billPurpose.name}
-                          </span>
-                        )}
-                        {(activeTab === 'transfer' || activeTab === 'saving') && (
-                          <span className="text-[10px] text-text-muted font-medium">
-                            {fromAcct?.name || '-'} ➔ {toAcct?.name || '-'}
-                          </span>
-                        )}
-                        {(activeTab === 'income' || activeTab === 'expense' || activeTab === 'bill') && (
-                          <span className="bg-surface-alt px-2 py-0.5 rounded-md text-[10px] font-medium text-text-muted">
-                            {fromAcct?.name || '-'}
-                          </span>
-                        )}
-                        {(activeTab === 'transfer' || activeTab === 'saving') && tx.admin_fee && Number(tx.admin_fee) > 0 && (
-                          <span className="text-[10px] text-text-muted font-medium">
-                            Admin: {fmt(Number(tx.admin_fee))}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  );
+                    );
+                  })()
                 })
               )}
             </div>
