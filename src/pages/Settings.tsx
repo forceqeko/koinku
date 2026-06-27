@@ -9,6 +9,7 @@ import EditProfileModal from '../components/EditProfileModal';
 import AppSettingsModal from '../components/AppSettingsModal';
 import { toast } from '../components/Toast';
 import { fmt } from '../lib/utils';
+import { getPurposeIcon } from '../lib/icons';
 
 type SettingTab = 'akun' | 'sumber' | 'kategori' | 'tujuan' | 'wishlist' | 'tagihan';
 
@@ -55,6 +56,7 @@ function Item({
   sub,
   trailing,
   iconUrl,
+  iconComp,
   onClick,
   isReordering,
   onMoveUp,
@@ -66,6 +68,7 @@ function Item({
   sub?: string;
   trailing?: string;
   iconUrl?: string;
+  iconComp?: React.ReactNode;
   onClick?: () => void;
   isReordering?: boolean;
   onMoveUp?: () => void;
@@ -78,6 +81,11 @@ function Item({
       <div className="flex items-center gap-4 flex-1 min-w-0">
         {iconUrl && (
           <img src={iconUrl} alt={label} className="w-10 h-10 rounded-xl object-cover object-center bg-surface border border-line flex-shrink-0" />
+        )}
+        {iconComp && (
+          <div className="w-10 h-10 rounded-xl bg-accent/15 border border-accent/25 text-accent flex items-center justify-center flex-shrink-0">
+            {iconComp}
+          </div>
         )}
         <div className="min-w-0 flex-1">
           <p className={clsx("text-[14px] font-semibold text-text-primary transition-colors truncate", !isReordering && "group-hover:text-accent")}>{label}</p>
@@ -155,6 +163,8 @@ export default function Settings() {
   const { user, logout } = useAuth();
   const { accounts, sources, categories, purposes, wishlists, billPurposes, refresh } = useData();
 
+  console.log('DEBUG [Purposes in Settings]:', purposes);
+
   const handleMoveAccount = async (idx: number, direction: 'up' | 'down') => {
     const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
     if (targetIdx < 0 || targetIdx >= accounts.length) return;
@@ -191,6 +201,7 @@ export default function Settings() {
       table = 'expense_categories';
     } else if (activeTab === 'tujuan') {
       table = 'expense_purposes';
+      if (data.icon) payload.icon = data.icon;
     } else if (activeTab === 'wishlist') {
       table = 'wishlists';
       payload.target_amount = data.targetAmount;
@@ -426,7 +437,15 @@ export default function Settings() {
         {activeTab === 'tujuan' && (
           <Section title="Tujuan Pengeluaran" onAdd={() => { setEditingItem(null); setIsModalOpen(true); }}>
             {purposes.map(p => {
-              return <Item key={p.id} label={p.name} onClick={() => { setEditingItem(p); setIsModalOpen(true); }} />;
+              const IconComp = getPurposeIcon(p.icon);
+              return (
+                <Item 
+                  key={p.id} 
+                  label={p.name} 
+                  iconComp={<IconComp className="w-5 h-5" />}
+                  onClick={() => { setEditingItem(p); setIsModalOpen(true); }} 
+                />
+              );
             })}
             {purposes.length === 0 && <p className="text-center text-sm font-medium text-text-muted py-8">Belum ada tujuan pengeluaran.</p>}
           </Section>

@@ -483,7 +483,7 @@ export default function ReceiptScanModal({
             <div className="flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-accent animate-pulse" />
               <h2 className="text-[15px] font-bold text-text-primary">
-                Scan Struk AI
+                Scan Struk
               </h2>
             </div>
             <button onClick={onClose} aria-label="Tutup modal" className="p-1.5 text-text-muted hover:text-text-primary hover:bg-surface-hover rounded-lg transition-all">

@@ -4,6 +4,7 @@ import { X, ChevronDown, Check, Building2, Smartphone, Wallet, Trash2, Search } 
 import { useData } from '../context/DataContext';
 import { formatThousands, parseThousands } from '../lib/utils';
 import clsx from 'clsx';
+import { getPurposeIcon } from '../lib/icons';
 
 interface TransactionModalProps {
   isOpen: boolean;
@@ -81,9 +82,10 @@ function ItemPicker({ isOpen, onClose, items, onSelect, selectedValue, title, pl
           ) : (
             filteredItems.map(item => {
               const isSelected = item.id === selectedValue;
-              let Icon = Wallet;
+              let Icon: any = Wallet;
               if (item.type === 'bank') Icon = Building2;
               if (item.type === 'ewallet') Icon = Smartphone;
+              if (item.icon) Icon = getPurposeIcon(item.icon);
 
               return (
                 <button
@@ -124,9 +126,10 @@ function ItemPicker({ isOpen, onClose, items, onSelect, selectedValue, title, pl
 
 function ItemTrigger({ items, value, onClick, label, placeholder = "Pilih..." }: { items: any[], value: string, onClick: () => void, label: string, placeholder?: string }) {
   const selected = items.find(a => a.id === value);
-  let SelectedIcon = Wallet;
+  let SelectedIcon: any = Wallet;
   if (selected?.type === 'bank') SelectedIcon = Building2;
   if (selected?.type === 'ewallet') SelectedIcon = Smartphone;
+  if (selected?.icon) SelectedIcon = getPurposeIcon(selected.icon);
 
   return (
     <div className="space-y-1.5">

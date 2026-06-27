@@ -11,6 +11,7 @@ import { toast } from '../components/Toast';
 import { fmt } from '../lib/utils';
 import type { Transaction, Account, Wishlist, ExpenseCategory, ExpensePurpose } from '../types';
 import { validateTransaction } from '../types';
+import { getPurposeIcon } from '../lib/icons';
 
 type Tab = 'income' | 'expense' | 'saving' | 'transfer' | 'bill';
 type SortKey = 'date' | 'description' | 'account' | 'admin_fee' | 'amount';
@@ -546,11 +547,15 @@ export default function Transactions() {
                             {category.name}
                           </span>
                         )}
-                        {activeTab === 'expense' && purpose && (
-                          <span className="bg-accent/5 px-2 py-0.5 rounded-md text-accent font-semibold border border-accent/10 text-[10px]">
-                            {purpose.name}
-                          </span>
-                        )}
+                        {activeTab === 'expense' && purpose && (() => {
+                          const IconComp = getPurposeIcon(purpose.icon);
+                          return (
+                            <span className="inline-flex items-center gap-1 bg-accent/5 px-2 py-0.5 rounded-md text-accent font-semibold border border-accent/10 text-[10px]">
+                              <IconComp className="w-3 h-3 shrink-0" />
+                              <span>{purpose.name}</span>
+                            </span>
+                          );
+                        })()}
                         {activeTab === 'bill' && billPurpose && (
                           <span className="bg-warning/10 px-2 py-0.5 rounded-md text-warning font-semibold border border-warning/20 text-[10px]">
                             {billPurpose.name}
@@ -639,11 +644,19 @@ export default function Transactions() {
                                     {category?.name || '-'}
                                   </span>
                                 </td>
-                                <td className="px-5 py-4 whitespace-nowrap">
-                                  <span className="inline-block max-w-[120px] truncate bg-accent/5 px-2 py-1 rounded-lg text-accent font-semibold border border-accent/10 text-[11px]">
-                                    {purpose?.name || '-'}
-                                  </span>
-                                </td>
+                                 <td className="px-5 py-4 whitespace-nowrap">
+                                   {purpose ? (() => {
+                                     const IconComp = getPurposeIcon(purpose.icon);
+                                     return (
+                                       <span className="inline-flex items-center gap-1.5 max-w-[120px] truncate bg-accent/5 px-2.5 py-1 rounded-lg text-accent font-semibold border border-accent/10 text-[11px]">
+                                         <IconComp className="w-3.5 h-3.5 shrink-0" />
+                                         <span className="truncate">{purpose.name}</span>
+                                       </span>
+                                     );
+                                   })() : (
+                                     <span className="inline-block max-w-[120px] truncate text-text-muted text-[11px]">-</span>
+                                   )}
+                                 </td>
                               </>
                             )}
                             {activeTab === 'bill' && (

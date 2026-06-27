@@ -57,6 +57,7 @@ export interface ExpenseCategory extends BaseEntity {
 export interface ExpensePurpose extends BaseEntity {
   name: string;
   category_id: string;
+  icon?: string | null;
 }
 
 // ============================================

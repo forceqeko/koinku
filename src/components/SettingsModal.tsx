@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import clsx from 'clsx';
 import { formatThousands, parseThousands } from '../lib/utils';
+import { PURPOSE_ICONS } from '../lib/icons';
 
 type SettingTab = 'akun' | 'sumber' | 'kategori' | 'tujuan' | 'wishlist' | 'tagihan';
 type AccountType = 'bank' | 'ewallet' | 'cash' | 'investasi';
@@ -181,6 +182,7 @@ export default function SettingsModal({ isOpen, onClose, type, onSave, onDelete,
   const [iconName, setIconName] = useState('');
   const [targetAmount, setTargetAmount] = useState('');
   const [currentAmount, setCurrentAmount] = useState('');
+  const [purposeIcon, setPurposeIcon] = useState('Question');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -210,6 +212,7 @@ export default function SettingsModal({ isOpen, onClose, type, onSave, onDelete,
         setIconName(nextIcon ? 'Logo tersimpan' : '');
         setTargetAmount(initialData.targetAmount !== undefined ? String(initialData.targetAmount) : '');
         setCurrentAmount(initialData.currentAmount !== undefined ? String(initialData.currentAmount) : '');
+        setPurposeIcon(initialData.icon || 'Question');
       } else {
         setName('');
         setInitialBalance('');
@@ -218,6 +221,7 @@ export default function SettingsModal({ isOpen, onClose, type, onSave, onDelete,
         setIconName('');
         setTargetAmount('');
         setCurrentAmount('');
+        setPurposeIcon('Question');
       }
     }
   }, [isOpen, initialData]);
@@ -288,6 +292,11 @@ export default function SettingsModal({ isOpen, onClose, type, onSave, onDelete,
         ...newData,
         targetAmount: Number(parseThousands(targetAmount || '0')),
         currentAmount: Number(parseThousands(currentAmount || '0')),
+      };
+    } else if (type === 'tujuan') {
+      newData = {
+        ...newData,
+        icon: purposeIcon,
       };
     }
 
@@ -466,6 +475,41 @@ export default function SettingsModal({ isOpen, onClose, type, onSave, onDelete,
                     className="input"
                     placeholder="0"
                   />
+                </div>
+              </div>
+            )}
+
+            {type === 'tujuan' && (
+              <div className="space-y-3">
+                <label className="block text-[13px] font-medium text-text-secondary">Pilih Icon Tujuan</label>
+                <div className="border border-line rounded-2xl p-4 bg-surface-alt/10 max-h-[250px] overflow-y-auto space-y-4 custom-scrollbar">
+                  {PURPOSE_ICONS.map((group) => (
+                    <div key={group.category} className="space-y-1.5">
+                      <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">{group.category}</p>
+                      <div className="grid grid-cols-6 gap-2">
+                        {group.icons.map((item) => {
+                          const IconComp = item.icon;
+                          const isSelected = purposeIcon === item.name;
+                          return (
+                            <button
+                              key={item.name}
+                              type="button"
+                              onClick={() => setPurposeIcon(item.name)}
+                              title={item.label}
+                              className={clsx(
+                                "aspect-square rounded-xl border flex items-center justify-center transition-all active:scale-90",
+                                isSelected 
+                                  ? "bg-accent border-accent text-bg shadow-md shadow-accent/25" 
+                                  : "bg-surface border-line text-text-muted hover:text-text-primary hover:border-text-muted"
+                              )}
+                            >
+                              <IconComp className="w-5 h-5" />
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
