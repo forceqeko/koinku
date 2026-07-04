@@ -475,14 +475,57 @@ export default function Transactions() {
             />
           </div>
 
-          <div className="grid grid-cols-5 bg-surface-alt/10 dark:bg-surface-alt/40 p-1 rounded-2xl border border-line w-full gap-0.5 md:gap-1">
+          {/* Mobile Tab Menu (Grid with Icons wrapped in Card) */}
+          <div className="card p-3 shadow-sm border border-line bg-surface md:hidden">
+            <div className="grid grid-cols-5 gap-1.5 text-center">
+              {tabs.map((tab) => {
+                const isSelected = activeTab === tab.id;
+                let TabIcon = ArrowDownLeft;
+                if (tab.id === 'expense') TabIcon = ArrowUpRight;
+                if (tab.id === 'saving') TabIcon = PiggyBank;
+                if (tab.id === 'transfer') TabIcon = ArrowLeftRight;
+                if (tab.id === 'bill') TabIcon = FileText;
+
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setActiveTab(tab.id)}
+                    className="flex flex-col items-center justify-center py-1 group focus:outline-none"
+                  >
+                    <div
+                      className={clsx(
+                        "w-11 h-11 rounded-2xl flex items-center justify-center transition-all border shrink-0",
+                        isSelected
+                          ? "bg-accent/10 border-2 border-accent text-accent shadow-md shadow-accent/10 scale-105"
+                          : "bg-surface border-line text-text-muted hover:bg-surface-hover hover:text-text-primary"
+                      )}
+                    >
+                      <TabIcon className="w-5 h-5" />
+                    </div>
+                    <span
+                      className={clsx(
+                        "text-[9px] font-bold mt-1.5 tracking-wider uppercase truncate w-full px-0.5",
+                        isSelected ? "text-accent font-extrabold" : "text-text-muted"
+                      )}
+                    >
+                      {tab.label}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Desktop Tab Menu (Segmented Text Bar) */}
+          <div className="hidden md:grid md:grid-cols-5 bg-surface-alt/10 dark:bg-surface-alt/40 p-1 rounded-2xl border border-line w-full gap-1">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={clsx(
                   'py-2 rounded-xl font-bold transition-all uppercase tracking-wider text-center',
-                  'text-[9px] leading-tight md:text-[11px] lg:text-[12px] md:px-3 lg:px-5',
+                  'text-[11px] lg:text-[12px] md:px-3 lg:px-5',
                   activeTab === tab.id
                     ? 'bg-accent text-bg shadow-md shadow-accent/10 dark:shadow-accent/5'
                     : 'text-text-muted hover:text-text-primary hover:bg-surface-hover'

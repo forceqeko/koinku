@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
-import { Plus, ChevronRight, LogOut, ArrowUpDown, ChevronUp, ChevronDown, Check, Sliders } from 'lucide-react';
+import { Plus, ChevronRight, LogOut, ArrowUpDown, ChevronUp, ChevronDown, Check, Sliders, Wallet, Coins, Tags, PiggyBank, FileText } from 'lucide-react';
 import clsx from 'clsx';
 import SettingsModal from '../components/SettingsModal';
 import EditProfileModal from '../components/EditProfileModal';
@@ -355,8 +355,54 @@ export default function Settings() {
       </div>
 
       {/* Modern Tabs */}
-      <div className="px-4 md:px-0 md:mx-6 mt-4">
-        <div className="flex md:grid md:grid-cols-6 bg-surface-alt/10 dark:bg-surface-alt/40 p-1 rounded-2xl border border-line w-full overflow-x-auto md:overflow-visible no-scrollbar gap-1">
+      {/* Mobile Tab Menu (Grid with Icons wrapped in Card) */}
+      <div className="px-4 md:px-0 md:mx-6 mt-4 md:hidden">
+        <div className="card p-3 shadow-sm border border-line bg-surface">
+          <div className="grid grid-cols-6 gap-1 text-center">
+            {tabs.map((tab) => {
+              const isSelected = activeTab === tab.id;
+              let TabIcon = Wallet;
+              if (tab.id === 'sumber') TabIcon = Coins;
+              if (tab.id === 'kategori') TabIcon = Tags;
+              if (tab.id === 'tujuan') TabIcon = Sliders;
+              if (tab.id === 'wishlist') TabIcon = PiggyBank;
+              if (tab.id === 'tagihan') TabIcon = FileText;
+
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => { setActiveTab(tab.id); setIsReordering(false); }}
+                  className="flex flex-col items-center justify-center py-1 group focus:outline-none"
+                >
+                  <div
+                    className={clsx(
+                      "w-10 h-10 rounded-2xl flex items-center justify-center transition-all border shrink-0",
+                      isSelected
+                        ? "bg-accent/10 border-2 border-accent text-accent shadow-md shadow-accent/10 scale-105"
+                        : "bg-surface border-line text-text-muted hover:bg-surface-hover hover:text-text-primary"
+                    )}
+                  >
+                    <TabIcon className="w-4.5 h-4.5" />
+                  </div>
+                  <span
+                    className={clsx(
+                      "text-[8.5px] font-bold mt-1.5 tracking-tight uppercase truncate w-full px-0.5",
+                      isSelected ? "text-accent font-extrabold" : "text-text-muted"
+                    )}
+                  >
+                    {tab.id === 'akun' ? 'Akun' : tab.label}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Desktop Tab Menu (Segmented Text Bar) */}
+      <div className="hidden md:block px-4 md:px-0 md:mx-6 mt-4">
+        <div className="grid grid-cols-6 bg-surface-alt/10 dark:bg-surface-alt/40 p-1 rounded-2xl border border-line w-full gap-1">
           {tabs.map(tab => (
             <button
               key={tab.id}
