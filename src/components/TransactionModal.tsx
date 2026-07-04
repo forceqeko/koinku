@@ -4,7 +4,7 @@ import { X, ChevronDown, Check, Building2, Smartphone, Wallet, Trash2, Search } 
 import { useData } from '../context/DataContext';
 import { formatThousands, parseThousands } from '../lib/utils';
 import clsx from 'clsx';
-import { getPurposeIcon } from '../lib/icons';
+import { getPurposeIcon, getCategoryColor } from '../lib/icons';
 
 interface TransactionModalProps {
   isOpen: boolean;
@@ -97,12 +97,15 @@ function ItemPicker({ isOpen, onClose, items, onSelect, selectedValue, title, pl
                   )}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-surface border border-line flex items-center justify-center shrink-0 shadow-sm group-hover:scale-105 transition-transform bg-white overflow-hidden">
-                      {item.icon_url ? (
-                        <img src={item.icon_url} alt={item.name} className="w-7 h-7 object-contain" />
-                      ) : (
-                        <Icon className="w-5 h-5 text-text-muted" />
-                      )}
+                    <div className={clsx(
+                       "w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border shadow-sm group-hover:scale-105 transition-transform overflow-hidden",
+                       item.icon ? getCategoryColor(item.icon) : "bg-white border-line text-text-muted"
+                     )}>
+                       {item.icon_url ? (
+                         <img src={item.icon_url} alt={item.name} className="w-7 h-7 object-contain" />
+                       ) : (
+                         <Icon className="w-5 h-5" />
+                       )}
                     </div>
                     <div className="text-left">
                       <p className={clsx("text-[13px] font-bold", isSelected ? "text-accent" : "text-text-primary")}>{item.name}</p>
@@ -141,13 +144,16 @@ function ItemTrigger({ items, value, onClick, label, placeholder = "Pilih..." }:
       >
         {selected ? (
           <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-white border border-line flex items-center justify-center overflow-hidden shrink-0">
-              {selected.icon_url ? (
-                 <img src={selected.icon_url} alt={selected.name} className="w-5 h-5 object-contain" />
-              ) : (
-                 <SelectedIcon className="w-4 h-4 text-text-muted" />
-              )}
-            </div>
+             <div className={clsx(
+               "w-7 h-7 rounded-lg flex items-center justify-center overflow-hidden shrink-0 border",
+               selected.icon ? getCategoryColor(selected.icon) : "bg-white border-line text-text-muted"
+             )}>
+               {selected.icon_url ? (
+                  <img src={selected.icon_url} alt={selected.name} className="w-5 h-5 object-contain" />
+               ) : (
+                  <SelectedIcon className="w-4 h-4" />
+               )}
+             </div>
             <span className="font-semibold text-text-primary text-[13px]">{selected.name}</span>
           </div>
         ) : (

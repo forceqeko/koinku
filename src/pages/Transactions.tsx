@@ -11,7 +11,7 @@ import { toast } from '../components/Toast';
 import { fmt } from '../lib/utils';
 import type { Transaction, Account, Wishlist, ExpenseCategory, ExpensePurpose } from '../types';
 import { validateTransaction } from '../types';
-import { getPurposeIcon } from '../lib/icons';
+import { getPurposeIcon, getCategoryColor } from '../lib/icons';
 
 type Tab = 'income' | 'expense' | 'saving' | 'transfer' | 'bill';
 type SortKey = 'date' | 'description' | 'account' | 'admin_fee' | 'amount';
@@ -524,7 +524,7 @@ export default function Transactions() {
 
                   return (() => {
                     // Determine main icon and background colors based on transaction type
-                    let MainIcon = ArrowUpRight;
+                    let MainIcon: any = ArrowUpRight;
                     let iconBg = 'bg-danger/10 border-danger/20 text-danger';
                     let sign = '-';
                     let amountColor = 'text-text-primary';
@@ -548,10 +548,10 @@ export default function Transactions() {
                     } else if (tx.type === 'expense') {
                       if (purpose && purpose.icon) {
                         MainIcon = getPurposeIcon(purpose.icon);
-                        iconBg = 'bg-accent/10 border border-accent/20 text-accent';
+                        iconBg = getCategoryColor(purpose.icon);
                       } else {
                         MainIcon = ArrowUpRight;
-                        iconBg = 'bg-danger/10 border border-danger/20 text-danger';
+                        iconBg = 'bg-danger/10 dark:bg-danger/5 border border-danger/20 dark:border-danger/10 text-danger';
                       }
                     }
 
@@ -692,8 +692,9 @@ export default function Transactions() {
                                  <td className="px-5 py-4 whitespace-nowrap">
                                    {purpose ? (() => {
                                      const IconComp = getPurposeIcon(purpose.icon);
+                                     const colorClass = getCategoryColor(purpose.icon);
                                      return (
-                                       <span className="inline-flex items-center gap-1.5 max-w-[120px] truncate bg-accent/5 px-2.5 py-1 rounded-lg text-accent font-semibold border border-accent/10 text-[11px]">
+                                       <span className={clsx("inline-flex items-center gap-1.5 max-w-[120px] truncate px-2.5 py-1 rounded-lg font-semibold border text-[11px]", colorClass)}>
                                          <IconComp className="w-3.5 h-3.5 shrink-0" />
                                          <span className="truncate">{purpose.name}</span>
                                        </span>

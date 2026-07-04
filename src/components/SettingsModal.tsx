@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import clsx from 'clsx';
 import { formatThousands, parseThousands } from '../lib/utils';
-import { PURPOSE_ICONS } from '../lib/icons';
+import { PURPOSE_ICONS, getCategoryColor } from '../lib/icons';
 
 type SettingTab = 'akun' | 'sumber' | 'kategori' | 'tujuan' | 'wishlist' | 'tagihan';
 type AccountType = 'bank' | 'ewallet' | 'cash' | 'investasi';
@@ -486,7 +486,7 @@ export default function SettingsModal({ isOpen, onClose, type, onSave, onDelete,
                   {PURPOSE_ICONS.map((group) => (
                     <div key={group.category} className="space-y-1.5">
                       <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">{group.category}</p>
-                      <div className="grid grid-cols-6 gap-2">
+                      <div className="grid grid-cols-5 gap-2.5">
                         {group.icons.map((item) => {
                           const IconComp = item.icon;
                           const isSelected = purposeIcon === item.name;
@@ -497,13 +497,13 @@ export default function SettingsModal({ isOpen, onClose, type, onSave, onDelete,
                               onClick={() => setPurposeIcon(item.name)}
                               title={item.label}
                               className={clsx(
-                                "aspect-square rounded-xl border flex items-center justify-center transition-all active:scale-90",
+                                "aspect-square rounded-2xl border flex items-center justify-center transition-all active:scale-90 p-2",
                                 isSelected 
-                                  ? "bg-accent border-accent text-bg shadow-md shadow-accent/25" 
-                                  : "bg-surface border-line text-text-muted hover:text-text-primary hover:border-text-muted"
+                                  ? "bg-accent border-accent text-bg shadow-md shadow-accent/25 ring-2 ring-accent ring-offset-2 dark:ring-offset-bg" 
+                                  : clsx(getCategoryColor(item.name), "hover:scale-105")
                               )}
                             >
-                              <IconComp className="w-5 h-5" />
+                              <IconComp className="w-8 h-8 shrink-0" />
                             </button>
                           );
                         })}

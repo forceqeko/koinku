@@ -9,7 +9,7 @@ import EditProfileModal from '../components/EditProfileModal';
 import AppSettingsModal from '../components/AppSettingsModal';
 import { toast } from '../components/Toast';
 import { fmt } from '../lib/utils';
-import { getPurposeIcon } from '../lib/icons';
+import { getPurposeIcon, getCategoryColor } from '../lib/icons';
 
 type SettingTab = 'akun' | 'sumber' | 'kategori' | 'tujuan' | 'wishlist' | 'tagihan';
 
@@ -57,6 +57,7 @@ function Item({
   trailing,
   iconUrl,
   iconComp,
+  iconBg,
   onClick,
   isReordering,
   onMoveUp,
@@ -69,6 +70,7 @@ function Item({
   trailing?: string;
   iconUrl?: string;
   iconComp?: React.ReactNode;
+  iconBg?: string;
   onClick?: () => void;
   isReordering?: boolean;
   onMoveUp?: () => void;
@@ -83,7 +85,7 @@ function Item({
           <img src={iconUrl} alt={label} className="w-10 h-10 rounded-xl object-cover object-center bg-surface border border-line flex-shrink-0" />
         )}
         {iconComp && (
-          <div className="w-10 h-10 rounded-xl bg-accent/15 border border-accent/25 text-accent flex items-center justify-center flex-shrink-0">
+          <div className={clsx("w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 border", iconBg || "bg-accent/15 border border-accent/25 text-accent")}>
             {iconComp}
           </div>
         )}
@@ -438,11 +440,13 @@ export default function Settings() {
           <Section title="Tujuan Pengeluaran" onAdd={() => { setEditingItem(null); setIsModalOpen(true); }}>
             {purposes.map(p => {
               const IconComp = getPurposeIcon(p.icon);
+              const colorClass = getCategoryColor(p.icon);
               return (
                 <Item 
                   key={p.id} 
                   label={p.name} 
                   iconComp={<IconComp className="w-5 h-5" />}
+                  iconBg={colorClass}
                   onClick={() => { setEditingItem(p); setIsModalOpen(true); }} 
                 />
               );
