@@ -127,20 +127,20 @@ export default function Dashboard() {
           </div>
           <div className="flex justify-center gap-3 mb-2">
             <div className="bg-white/10 dark:bg-surface/50 backdrop-blur-md px-4 py-2.5 rounded-2xl flex items-center gap-2 border border-white/20 dark:border-line shadow-sm">
-              <div className="w-5 h-5 rounded-full bg-success flex items-center justify-center shadow-inner">
-                <ArrowDownLeft size={12} weight="bold" className="text-white dark:text-bg" />
+              <div className="w-5 h-5 rounded-full bg-[#10b981] flex items-center justify-center shadow-inner">
+                <ArrowDownLeft size={12} weight="bold" className="text-white" />
               </div>
               <span className="font-semibold text-[13px]">{showBalance ? fmt(income) : '••••'}</span>
             </div>
             <div className="bg-white/10 dark:bg-surface/50 backdrop-blur-md px-4 py-2.5 rounded-2xl flex items-center gap-2 border border-white/20 dark:border-line shadow-sm">
-              <div className="w-5 h-5 rounded-full bg-danger flex items-center justify-center shadow-inner">
-                <ArrowUpRight size={12} weight="bold" className="text-white dark:text-bg" />
+              <div className="w-5 h-5 rounded-full bg-[#ef4444] flex items-center justify-center shadow-inner">
+                <ArrowUpRight size={12} weight="bold" className="text-white" />
               </div>
               <span className="font-semibold text-[13px]">{showBalance ? fmt(expense) : '••••'}</span>
             </div>
             <div className="bg-white/10 dark:bg-surface/50 backdrop-blur-md px-4 py-2.5 rounded-2xl flex items-center gap-2 border border-white/20 dark:border-line shadow-sm">
-              <div className="w-5 h-5 rounded-full bg-accent flex items-center justify-center shadow-inner">
-                <PiggyBank size={12} weight="bold" className="text-white dark:text-bg" />
+              <div className="w-5 h-5 rounded-full bg-[#3b82f6] flex items-center justify-center shadow-inner">
+                <PiggyBank size={12} weight="bold" className="text-white" />
               </div>
               <span className="font-semibold text-[13px]">{showBalance ? fmt(saving) : '••••'}</span>
             </div>
