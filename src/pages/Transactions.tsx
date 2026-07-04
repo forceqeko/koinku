@@ -564,7 +564,7 @@ export default function Transactions() {
                         <div className="flex items-center gap-3.5">
                           {/* Circular Large Icon Box */}
                           <div className={clsx("w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 border", iconBg)}>
-                            <MainIcon className="w-5 h-5 shrink-0" />
+                            <MainIcon className="w-8 h-8 shrink-0" />
                           </div>
 
                           {/* Info Column */}

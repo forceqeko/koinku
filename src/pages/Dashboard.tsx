@@ -1,13 +1,13 @@
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
-import { 
-  ArrowDownLeft, 
-  ArrowUpRight, 
-  Wallet, 
-  PiggyBank, 
-  Eye, 
-  EyeSlash, 
-  Briefcase, 
+import {
+  ArrowDownLeft,
+  ArrowUpRight,
+  Wallet,
+  PiggyBank,
+  Eye,
+  EyeSlash,
+  Briefcase,
   HandCoins,
   ArrowsLeftRight,
   FileText
@@ -40,7 +40,7 @@ export default function Dashboard() {
   const currentYear = now.getFullYear();
 
   const totalBalance = accounts.reduce((acc, curr) => acc + Number(curr.balance), 0);
-  
+
   const currentMonthTx = transactions.filter(t => {
     const d = new Date(t.date);
     return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
@@ -71,12 +71,12 @@ export default function Dashboard() {
   const perfBadge = income === 0 && expense === 0 && saving === 0
     ? { label: 'Belum Ada Data', color: 'text-text-muted bg-surface-alt' }
     : expenseRatio <= 50
-    ? { label: 'Optimal', color: 'text-success bg-success/10' }
-    : expenseRatio <= 80
-    ? { label: 'Normal', color: 'text-accent bg-accent/10' }
-    : expenseRatio <= 100
-    ? { label: 'Waspada', color: 'text-warning bg-warning/10' }
-    : { label: 'Over Budget', color: 'text-danger bg-danger/10' };
+      ? { label: 'Optimal', color: 'text-success bg-success/10' }
+      : expenseRatio <= 80
+        ? { label: 'Normal', color: 'text-accent bg-accent/10' }
+        : expenseRatio <= 100
+          ? { label: 'Waspada', color: 'text-warning bg-warning/10' }
+          : { label: 'Over Budget', color: 'text-danger bg-danger/10' };
 
   return (
     <div className="relative min-h-screen pb-24 md:pb-6">
@@ -126,50 +126,50 @@ export default function Dashboard() {
             <p className="text-[11px] font-medium text-bg/60 dark:text-text-muted uppercase tracking-wider">Ringkasan {currentMonthName}</p>
           </div>
           <div className="flex justify-center gap-3 mb-2">
-             <div className="bg-white/10 dark:bg-surface/50 backdrop-blur-md px-4 py-2.5 rounded-2xl flex items-center gap-2 border border-white/20 dark:border-line shadow-sm">
-                <div className="w-5 h-5 rounded-full bg-success flex items-center justify-center shadow-inner">
-                  <ArrowDownLeft size={12} weight="bold" className="text-white dark:text-bg" />
-                </div>
-                <span className="font-semibold text-[13px]">{showBalance ? fmt(income) : '••••'}</span>
-             </div>
-             <div className="bg-white/10 dark:bg-surface/50 backdrop-blur-md px-4 py-2.5 rounded-2xl flex items-center gap-2 border border-white/20 dark:border-line shadow-sm">
-                <div className="w-5 h-5 rounded-full bg-danger flex items-center justify-center shadow-inner">
-                  <ArrowUpRight size={12} weight="bold" className="text-white dark:text-bg" />
-                </div>
-                <span className="font-semibold text-[13px]">{showBalance ? fmt(expense) : '••••'}</span>
-             </div>
-             <div className="bg-white/10 dark:bg-surface/50 backdrop-blur-md px-4 py-2.5 rounded-2xl flex items-center gap-2 border border-white/20 dark:border-line shadow-sm">
-                <div className="w-5 h-5 rounded-full bg-accent flex items-center justify-center shadow-inner">
-                  <PiggyBank size={12} weight="bold" className="text-white dark:text-bg" />
-                </div>
-                <span className="font-semibold text-[13px]">{showBalance ? fmt(saving) : '••••'}</span>
-             </div>
+            <div className="bg-white/10 dark:bg-surface/50 backdrop-blur-md px-4 py-2.5 rounded-2xl flex items-center gap-2 border border-white/20 dark:border-line shadow-sm">
+              <div className="w-5 h-5 rounded-full bg-success flex items-center justify-center shadow-inner">
+                <ArrowDownLeft size={12} weight="bold" className="text-white dark:text-bg" />
+              </div>
+              <span className="font-semibold text-[13px]">{showBalance ? fmt(income) : '••••'}</span>
+            </div>
+            <div className="bg-white/10 dark:bg-surface/50 backdrop-blur-md px-4 py-2.5 rounded-2xl flex items-center gap-2 border border-white/20 dark:border-line shadow-sm">
+              <div className="w-5 h-5 rounded-full bg-danger flex items-center justify-center shadow-inner">
+                <ArrowUpRight size={12} weight="bold" className="text-white dark:text-bg" />
+              </div>
+              <span className="font-semibold text-[13px]">{showBalance ? fmt(expense) : '••••'}</span>
+            </div>
+            <div className="bg-white/10 dark:bg-surface/50 backdrop-blur-md px-4 py-2.5 rounded-2xl flex items-center gap-2 border border-white/20 dark:border-line shadow-sm">
+              <div className="w-5 h-5 rounded-full bg-accent flex items-center justify-center shadow-inner">
+                <PiggyBank size={12} weight="bold" className="text-white dark:text-bg" />
+              </div>
+              <span className="font-semibold text-[13px]">{showBalance ? fmt(saving) : '••••'}</span>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Overlapping Content Container */}
       <div className="max-w-[1100px] mx-auto px-4 -mt-16 relative z-10 space-y-5">
-        
+
         {/* Budget Performance Card */}
         <div className="card p-5 shadow-lg shadow-black/5 border-line bg-surface">
-           <div className="flex justify-between items-center mb-4">
-              <h2 className="font-bold text-[15px] text-text-primary">Performa Bulan Ini</h2>
-              <span className={clsx("text-[11px] font-medium px-2 py-1 rounded-md", perfBadge.color)}>{perfBadge.label}</span>
-           </div>
-           
-           <div className="space-y-3">
-             <div className="flex justify-between text-[13px]">
-               <span className="text-text-muted font-medium">Sisa Budget</span>
-               <span className="font-semibold text-text-primary">{showBalance ? fmt(Math.max(0, income - expense - saving)) : '••••'}</span>
-             </div>
-             <div className="bg-surface-alt rounded-full h-2.5 overflow-hidden shadow-inner">
-                <div className="bg-accent h-full rounded-full transition-all duration-1000 ease-out" style={{ width: `${Math.min(100, ((expense + saving) / (income || 1)) * 100)}%` }}></div>
-             </div>
-             <p className="text-[11px] text-text-muted font-medium">
-               {showBalance ? `Terpakai ${fmt(expense + saving)} dari ${fmt(income)}` : 'Terpakai •••• dari ••••'}
-             </p>
-           </div>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="font-bold text-[15px] text-text-primary">Performa Bulan Ini</h2>
+            <span className={clsx("text-[11px] font-medium px-2 py-1 rounded-md", perfBadge.color)}>{perfBadge.label}</span>
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex justify-between text-[13px]">
+              <span className="text-text-muted font-medium">Sisa Budget</span>
+              <span className="font-semibold text-text-primary">{showBalance ? fmt(Math.max(0, income - expense - saving)) : '••••'}</span>
+            </div>
+            <div className="bg-surface-alt rounded-full h-2.5 overflow-hidden shadow-inner">
+              <div className="bg-accent h-full rounded-full transition-all duration-1000 ease-out" style={{ width: `${Math.min(100, ((expense + saving) / (income || 1)) * 100)}%` }}></div>
+            </div>
+            <p className="text-[11px] text-text-muted font-medium">
+              {showBalance ? `Terpakai ${fmt(expense + saving)} dari ${fmt(income)}` : 'Terpakai •••• dari ••••'}
+            </p>
+          </div>
         </div>
 
         {/* Quick Access Grid Menu (Single Card Wrapper) */}
@@ -179,7 +179,7 @@ export default function Dashboard() {
               to="/wallet"
               className="flex flex-col items-center justify-center py-2.5 rounded-2xl hover:bg-surface-alt/50 active:scale-95 transition-all group"
             >
-              <div className="w-12 h-12 rounded-2xl bg-accent/5 border border-accent/20 text-accent flex items-center justify-center mb-2 group-hover:scale-110 transition-all">
+              <div className="w-12 h-12 rounded-2xl bg-accent/5 border-2 border-accent/35 text-accent flex items-center justify-center mb-2 group-hover:scale-110 transition-all">
                 <Wallet size={20} weight="duotone" />
               </div>
               <span className="text-[11px] sm:text-[12px] font-bold text-text-primary">Wallet</span>
@@ -189,7 +189,7 @@ export default function Dashboard() {
               to="/tabungan"
               className="flex flex-col items-center justify-center py-2.5 rounded-2xl hover:bg-surface-alt/50 active:scale-95 transition-all group"
             >
-              <div className="w-12 h-12 rounded-2xl bg-accent/5 border border-accent/20 text-accent flex items-center justify-center mb-2 group-hover:scale-110 transition-all">
+              <div className="w-12 h-12 rounded-2xl bg-accent/5 border-2 border-accent/35 text-accent flex items-center justify-center mb-2 group-hover:scale-110 transition-all">
                 <PiggyBank size={20} weight="duotone" />
               </div>
               <span className="text-[11px] sm:text-[12px] font-bold text-text-primary">Tabungan</span>
@@ -199,7 +199,7 @@ export default function Dashboard() {
               to="/investment"
               className="flex flex-col items-center justify-center py-2.5 rounded-2xl hover:bg-surface-alt/50 active:scale-95 transition-all group"
             >
-              <div className="w-12 h-12 rounded-2xl bg-accent/5 border border-accent/20 text-accent flex items-center justify-center mb-2 group-hover:scale-110 transition-all">
+              <div className="w-12 h-12 rounded-2xl bg-accent/5 border-2 border-accent/35 text-accent flex items-center justify-center mb-2 group-hover:scale-110 transition-all">
                 <Briefcase size={20} weight="duotone" />
               </div>
               <span className="text-[11px] sm:text-[12px] font-bold text-text-primary">Investasi</span>
@@ -209,7 +209,7 @@ export default function Dashboard() {
               to="/hutang"
               className="flex flex-col items-center justify-center py-2.5 rounded-2xl hover:bg-surface-alt/50 active:scale-95 transition-all group"
             >
-              <div className="w-12 h-12 rounded-2xl bg-accent/5 border border-accent/20 text-accent flex items-center justify-center mb-2 group-hover:scale-110 transition-all">
+              <div className="w-12 h-12 rounded-2xl bg-accent/5 border-2 border-accent/35 text-accent flex items-center justify-center mb-2 group-hover:scale-110 transition-all">
                 <HandCoins size={20} weight="duotone" />
               </div>
               <span className="text-[11px] sm:text-[12px] font-bold text-text-primary">Hutang</span>
@@ -221,8 +221,8 @@ export default function Dashboard() {
         <div className="card p-5 shadow-sm border border-line bg-surface space-y-4">
           <div className="flex justify-between items-center">
             <h2 className="font-bold text-[15px] text-text-primary">Riwayat Transaksi Terakhir</h2>
-            <Link 
-              to="/transactions" 
+            <Link
+              to="/transactions"
               className="text-[12px] font-bold text-accent hover:text-accent-hover transition-colors"
             >
               Lihat Semua

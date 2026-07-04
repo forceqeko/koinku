@@ -631,16 +631,30 @@ export default function Report() {
     const pageHeight = doc.internal.pageSize.getHeight();
     const periodLabel = selectedMonth !== null ? `${FULL_MONTH_NAMES[selectedMonth]} ${selectedYear}` : `Tahun ${selectedYear}`;
 
+    const parseColorToRgb = (cssVarName: string, fallbackRgb: [number, number, number]): [number, number, number] => {
+      const tempEl = document.createElement('div');
+      tempEl.style.color = `var(${cssVarName})`;
+      document.body.appendChild(tempEl);
+      const computedColor = getComputedStyle(tempEl).color;
+      document.body.removeChild(tempEl);
+      
+      const match = computedColor.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+      if (match) {
+        return [parseInt(match[1]), parseInt(match[2]), parseInt(match[3])];
+      }
+      return fallbackRgb;
+    };
+
     const colors = {
-      primary: [22, 101, 52] as [number, number, number],
-      primarySoft: [232, 242, 236] as [number, number, number],
-      accent: [201, 162, 39] as [number, number, number],
-      text: [30, 41, 59] as [number, number, number],
-      muted: [100, 116, 139] as [number, number, number],
-      line: [226, 232, 240] as [number, number, number],
-      success: [22, 163, 74] as [number, number, number],
-      danger: [220, 38, 38] as [number, number, number],
-      saving: [8, 145, 178] as [number, number, number],
+      primary: parseColorToRgb('--primary', [22, 101, 52]),
+      primarySoft: parseColorToRgb('--muted', [232, 242, 236]),
+      accent: parseColorToRgb('--accent', [201, 162, 39]),
+      text: parseColorToRgb('--foreground', [30, 41, 59]),
+      muted: parseColorToRgb('--muted-foreground', [100, 116, 139]),
+      line: parseColorToRgb('--border', [226, 232, 240]),
+      success: parseColorToRgb('--chart-2', [22, 163, 74]),
+      danger: parseColorToRgb('--destructive', [220, 38, 38]),
+      saving: parseColorToRgb('--chart-3', [8, 145, 178]),
     };
 
     let cursorY = 18;
@@ -1697,7 +1711,12 @@ export default function Report() {
                         tickLine={false}
                         axisLine={false}
                       />
-                      <Tooltip formatter={(v: number) => fmt(v)} />
+                      <Tooltip 
+                        formatter={(v: number) => fmt(v)} 
+                        contentStyle={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)', borderRadius: '12px' }}
+                        itemStyle={{ color: 'var(--color-text-primary)' }}
+                        labelStyle={{ color: 'var(--color-text-muted)' }}
+                      />
                       <Bar
                         dataKey="Pengeluaran"
                         fill="var(--chart-5)"
@@ -1720,7 +1739,12 @@ export default function Report() {
                     }}>
                       <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--color-text-muted)' }} tickLine={false} axisLine={false} />
                       <YAxis tickFormatter={v => `${(v / 1000000).toFixed(1)}M`} tick={{ fontSize: 11, fill: 'var(--color-text-muted)' }} tickLine={false} axisLine={false} />
-                      <Tooltip formatter={(v: number) => fmt(v)} />
+                      <Tooltip 
+                        formatter={(v: number) => fmt(v)} 
+                        contentStyle={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)', borderRadius: '12px' }}
+                        itemStyle={{ color: 'var(--color-text-primary)' }}
+                        labelStyle={{ color: 'var(--color-text-muted)' }}
+                      />
                       <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '11px' }} />
                       <Line
                         type="monotone"
@@ -1766,6 +1790,9 @@ export default function Report() {
                       </Pie>
                       <Tooltip
                         formatter={(v: number, name: string) => [`${fmt(v)} (${((v / totalExpense) * 100).toFixed(1)}%)`, name]}
+                        contentStyle={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)', borderRadius: '12px' }}
+                        itemStyle={{ color: 'var(--color-text-primary)' }}
+                        labelStyle={{ color: 'var(--color-text-muted)' }}
                       />
                     </PieChart>
                   </ResponsiveContainer>
