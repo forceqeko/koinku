@@ -1043,130 +1043,133 @@ export default function Report() {
 
   return (
     <div className="p-4 md:p-6 pb-24 md:pb-6 space-y-5 max-w-[1200px] mx-auto">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         {/* Sisi Kiri: Filter Kontrol */}
-        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full md:w-auto">
           {/* Segmented Control untuk Bulanan vs Tahunan */}
-          <div className="flex bg-surface p-1 rounded-2xl border border-line shrink-0 h-[46px] shadow-sm">
-            <button
-              onClick={() => {
-                if (selectedMonth === null) {
-                  setSelectedMonth(new Date().getMonth());
-                }
-              }}
-              className={clsx(
-                "px-4 rounded-xl text-[12px] md:text-[13px] font-bold transition-all",
-                selectedMonth !== null
-                  ? "bg-accent text-bg shadow-md shadow-accent/10 dark:shadow-accent/5"
-                  : "text-text-muted hover:text-text-primary hover:bg-surface-hover/50"
-              )}
-            >
-              Bulanan
-            </button>
-            <button
-              onClick={() => setSelectedMonth(null)}
-              className={clsx(
-                "px-4 rounded-xl text-[12px] md:text-[13px] font-bold transition-all",
-                selectedMonth === null
-                  ? "bg-accent text-bg shadow-md shadow-accent/10 dark:shadow-accent/5"
-                  : "text-text-muted hover:text-text-primary hover:bg-surface-hover/50"
-              )}
-            >
-              Tahunan
-            </button>
-          </div>
-
-          {/* Dropdown Bulan (Hanya muncul jika mode Bulanan / selectedMonth !== null) */}
-          {selectedMonth !== null && (
-            <div className="flex items-center gap-1.5 w-full md:w-auto">
+            <div className="flex bg-surface p-1 rounded-2xl border border-line shrink-0 h-[46px] shadow-sm w-full sm:w-auto justify-center">
               <button
-                onClick={handlePrevMonth}
-                className="h-[46px] w-10 flex items-center justify-center bg-surface border border-line rounded-2xl shadow-sm hover:border-accent/40 text-text-muted hover:text-text-primary transition-all"
-                title="Bulan Sebelumnya"
+                onClick={() => {
+                  if (selectedMonth === null) {
+                    setSelectedMonth(new Date().getMonth());
+                  }
+                }}
+                className={clsx(
+                  "px-4 rounded-xl text-[12px] md:text-[13px] font-bold transition-all",
+                  selectedMonth !== null
+                    ? "bg-accent text-bg shadow-md shadow-accent/10 dark:shadow-accent/5"
+                    : "text-text-muted hover:text-text-primary hover:bg-surface-hover/50"
+                )}
               >
-                <ChevronLeft className="w-4 h-4" />
+                Bulanan
               </button>
+              <button
+                onClick={() => setSelectedMonth(null)}
+                className={clsx(
+                  "px-4 rounded-xl text-[12px] md:text-[13px] font-bold transition-all",
+                  selectedMonth === null
+                    ? "bg-accent text-bg shadow-md shadow-accent/10 dark:shadow-accent/5"
+                    : "text-text-muted hover:text-text-primary hover:bg-surface-hover/50"
+                )}
+              >
+                Tahunan
+              </button>
+            </div>
 
-              <div className="relative flex-1 md:flex-initial" ref={monthPickerRef}>
+            {/* Row untuk Month Picker dan Year Picker secara side-by-side di mobile */}
+            <div className="flex flex-row items-center gap-2 w-full md:w-auto">
+              {/* Dropdown Bulan (Hanya muncul jika mode Bulanan / selectedMonth !== null) */}
+              {selectedMonth !== null && (
+                <div className="flex items-center gap-1 w-full md:w-auto flex-[1.2] md:flex-initial">
+                  <button
+                    onClick={handlePrevMonth}
+                    className="h-[46px] w-9 flex-shrink-0 flex items-center justify-center bg-surface border border-line rounded-2xl shadow-sm hover:border-accent/40 text-text-muted hover:text-text-primary transition-all"
+                    title="Bulan Sebelumnya"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+
+                  <div className="relative flex-1 md:flex-initial" ref={monthPickerRef}>
+                    <button
+                      onClick={() => setIsMonthPickerOpen(!isMonthPickerOpen)}
+                      className="bg-surface border border-line px-3 md:px-5 py-2.5 rounded-2xl flex items-center gap-1.5 md:gap-3 shadow-sm hover:border-accent/40 transition-all font-bold text-[12px] md:text-[13px] text-text-primary justify-between group h-[46px] w-full md:w-[150px] min-w-0"
+                    >
+                      <span className="truncate">{FULL_MONTH_NAMES[selectedMonth]}</span>
+                      <ChevronDown className={clsx("w-4 h-4 text-text-muted transition-transform duration-300 flex-shrink-0", isMonthPickerOpen && "rotate-180")} />
+                    </button>
+
+                    {isMonthPickerOpen && (
+                      <div className="absolute top-full left-0 mt-2 z-30 w-[180px] bg-surface border border-line rounded-2xl shadow-2xl overflow-hidden animate-scale-in p-1">
+                        <div className="grid grid-cols-2 gap-1 max-h-[300px] overflow-y-auto custom-scrollbar">
+                          {MONTH_NAMES.map((name, idx) => {
+                            const hasData = yearTx.some(t => new Date(t.date).getMonth() === idx);
+                            return (
+                              <button
+                                key={name}
+                                onClick={() => { handleMonthClick(idx); setIsMonthPickerOpen(false); }}
+                                className={clsx(
+                                  "px-3 py-2.5 rounded-xl text-left text-[12px] transition-all flex items-center justify-between group",
+                                  selectedMonth === idx
+                                    ? "bg-accent text-white font-bold"
+                                    : hasData
+                                      ? "text-text-primary hover:bg-surface-hover hover:text-accent font-medium"
+                                      : "text-text-muted/50 font-medium"
+                                )}
+                              >
+                                {name}
+                                {selectedMonth === idx && <div className="w-1.5 h-1.5 rounded-full bg-white opacity-80" />}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <button
+                    onClick={handleNextMonth}
+                    className="h-[46px] w-9 flex-shrink-0 flex items-center justify-center bg-surface border border-line rounded-2xl shadow-sm hover:border-accent/40 text-text-muted hover:text-text-primary transition-all"
+                    title="Bulan Berikutnya"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+
+              {/* Dropdown Tahun */}
+              <div className="relative flex-1 md:flex-initial" ref={yearPickerRef}>
                 <button
-                  onClick={() => setIsMonthPickerOpen(!isMonthPickerOpen)}
-                  className="bg-surface border border-line px-4 md:px-5 py-2.5 rounded-2xl flex items-center gap-2 md:gap-3 shadow-sm hover:border-accent/40 transition-all font-bold text-[12px] md:text-[13px] text-text-primary justify-between group h-[46px] w-full md:min-w-[150px]"
+                  onClick={() => setIsYearPickerOpen(!isYearPickerOpen)}
+                  className="bg-surface border border-line px-3 md:px-5 py-2.5 rounded-2xl flex items-center gap-1.5 md:gap-3 shadow-sm hover:border-accent/40 transition-all font-bold text-[12px] md:text-[13px] text-text-primary justify-between group h-[46px] w-full md:w-[128px] min-w-0"
                 >
-                  <span>{FULL_MONTH_NAMES[selectedMonth]}</span>
-                  <ChevronDown className={clsx("w-4 h-4 text-text-muted transition-transform duration-300", isMonthPickerOpen && "rotate-180")} />
+                  <span className="truncate">Tahun {selectedYear}</span>
+                  <ChevronDown className={clsx("w-4 h-4 text-text-muted transition-transform duration-300 flex-shrink-0", isYearPickerOpen && "rotate-180")} />
                 </button>
 
-                {isMonthPickerOpen && (
-                  <div className="absolute top-full left-0 mt-2 z-30 w-[180px] bg-surface border border-line rounded-2xl shadow-2xl overflow-hidden animate-scale-in p-1">
-                    <div className="grid grid-cols-2 gap-1 max-h-[300px] overflow-y-auto custom-scrollbar">
-                      {MONTH_NAMES.map((name, idx) => {
-                        const hasData = yearTx.some(t => new Date(t.date).getMonth() === idx);
-                        return (
-                          <button
-                            key={name}
-                            onClick={() => { handleMonthClick(idx); setIsMonthPickerOpen(false); }}
-                            className={clsx(
-                              "px-3 py-2.5 rounded-xl text-left text-[12px] transition-all flex items-center justify-between group",
-                              selectedMonth === idx
-                                ? "bg-accent text-white font-bold"
-                                : hasData
-                                  ? "text-text-primary hover:bg-surface-hover hover:text-accent font-medium"
-                                  : "text-text-muted/50 font-medium"
-                            )}
-                          >
-                            {name}
-                            {selectedMonth === idx && <div className="w-1.5 h-1.5 rounded-full bg-white opacity-80" />}
-                          </button>
-                        );
-                      })}
+                {isYearPickerOpen && (
+                  <div className="absolute top-full left-0 mt-2 z-30 w-[160px] bg-surface border border-line rounded-2xl shadow-2xl overflow-hidden animate-scale-in p-1">
+                    <div className="grid grid-cols-1 max-h-[200px] overflow-y-auto custom-scrollbar">
+                      {availableYears.map(y => (
+                        <button
+                          key={y}
+                          onClick={() => { setSelectedYear(y); setIsYearPickerOpen(false); }}
+                          className={clsx(
+                            "w-full px-4 py-2.5 rounded-xl text-left text-[13px] transition-all flex items-center justify-between group",
+                            selectedYear === y
+                              ? "bg-accent text-white font-bold"
+                              : "text-text-primary hover:bg-surface-hover hover:text-accent font-medium"
+                          )}
+                        >
+                          {y}
+                          {selectedYear === y && <div className="w-1.5 h-1.5 rounded-full bg-white opacity-80" />}
+                        </button>
+                      ))}
                     </div>
                   </div>
                 )}
               </div>
-
-              <button
-                onClick={handleNextMonth}
-                className="h-[46px] w-10 flex items-center justify-center bg-surface border border-line rounded-2xl shadow-sm hover:border-accent/40 text-text-muted hover:text-text-primary transition-all"
-                title="Bulan Berikutnya"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
             </div>
-          )}
-
-          {/* Dropdown Tahun */}
-          <div className="relative flex-1 md:flex-initial" ref={yearPickerRef}>
-            <button
-              onClick={() => setIsYearPickerOpen(!isYearPickerOpen)}
-              className="bg-surface border border-line px-4 md:px-5 py-2.5 rounded-2xl flex items-center gap-2 md:gap-3 shadow-sm hover:border-accent/40 transition-all font-bold text-[12px] md:text-[13px] text-text-primary justify-between group h-[46px] w-full md:min-w-[128px]"
-            >
-              <span>Tahun {selectedYear}</span>
-              <ChevronDown className={clsx("w-4 h-4 text-text-muted transition-transform duration-300", isYearPickerOpen && "rotate-180")} />
-            </button>
-
-            {isYearPickerOpen && (
-              <div className="absolute top-full left-0 mt-2 z-30 w-[160px] bg-surface border border-line rounded-2xl shadow-2xl overflow-hidden animate-scale-in p-1">
-                <div className="grid grid-cols-1 max-h-[200px] overflow-y-auto custom-scrollbar">
-                  {availableYears.map(y => (
-                    <button
-                      key={y}
-                      onClick={() => { setSelectedYear(y); setIsYearPickerOpen(false); }}
-                      className={clsx(
-                        "w-full px-4 py-2.5 rounded-xl text-left text-[13px] transition-all flex items-center justify-between group",
-                        selectedYear === y
-                          ? "bg-accent text-white font-bold"
-                          : "text-text-primary hover:bg-surface-hover hover:text-accent font-medium"
-                      )}
-                    >
-                      {y}
-                      {selectedYear === y && <div className="w-1.5 h-1.5 rounded-full bg-white opacity-80" />}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
-        </div>
 
         {/* Sisi Kanan: Tombol Aksi Export */}
         <div className="flex items-center gap-2 w-full md:w-auto md:justify-end animate-fade-in mt-2 md:mt-0">
