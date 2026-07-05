@@ -1,11 +1,11 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
-export type Theme = 'green-yellow' | 'black-green' | 'celestial-blue';
+export type Theme = 'fresh-green' | 'black-green' | 'celestial-blue';
 
 export const themeOptions = [
   {
-    id: 'green-yellow' as const,
-    label: 'Green and Yellow',
+    id: 'fresh-green' as const,
+    label: 'Fresh Green',
     description: 'Tema terang bawaan dengan aksen hijau hangat.',
     isDark: false,
   },
@@ -34,10 +34,10 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<Theme>(() => {
     const saved = localStorage.getItem('fintrack_theme');
-    if (saved === 'green-yellow' || saved === 'black-green' || saved === 'celestial-blue') return saved;
+    if (saved === 'fresh-green' || saved === 'black-green' || saved === 'celestial-blue') return saved;
     if (saved === 'dark') return 'black-green';
-    if (saved === 'light') return 'green-yellow';
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'black-green' : 'green-yellow';
+    if (saved === 'light') return 'fresh-green';
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'black-green' : 'fresh-green';
   });
 
   useEffect(() => {

@@ -7,7 +7,7 @@
 /* ─── Light ─────────────────────────────────── */
 :root {
   /* Colors */
-  --background: oklch(0.9870 0.0031 91.4370);
+  --background: oklch(1.0000 0 0);
   --foreground: oklch(0.1759 0.0275 161.2531);
   --card: oklch(1.0000 0 0);
   --card-foreground: oklch(0.1759 0.0275 161.2531);
