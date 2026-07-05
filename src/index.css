@@ -89,7 +89,7 @@
 [data-theme="celestial-blue"] {
   --background: oklch(1.0000 0 0);
   --foreground: oklch(0 0 0);
-  --card: #f8fafc;
+  --card: oklch(1.0000 0 0);
   --card-foreground: oklch(0.2435 0 0);
   --popover: oklch(1.0000 0 0);
   --popover-foreground: oklch(0.3171 0 0);
