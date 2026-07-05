@@ -80,7 +80,7 @@ export default function ThemeDropdown({
                     setIsOpen(false);
                   }}
                   className={clsx(
-                    'w-full px-4 py-3 rounded-xl text-left transition-all flex items-start justify-between gap-3 group',
+                    'w-full px-4 py-3 rounded-xl text-left transition-all flex items-center justify-between gap-3 group',
                     isSelected
                       ? 'bg-accent font-bold'
                       : 'text-text-primary hover:bg-surface-hover hover:text-accent'
@@ -89,12 +89,6 @@ export default function ThemeDropdown({
                 >
                   <div className="min-w-0">
                     <p className="text-[13px] font-semibold">{item.label}</p>
-                    <p
-                      className={clsx('text-[11px] mt-0.5', !isSelected && 'text-text-muted group-hover:text-accent/80')}
-                      style={isSelected ? { color: 'color-mix(in oklab, var(--primary-foreground) 78%, transparent)' } : undefined}
-                    >
-                      {item.description}
-                    </p>
                   </div>
                   {isSelected && (
                     <div className="w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5" style={{ backgroundColor: 'color-mix(in oklab, var(--primary-foreground) 15%, transparent)' }}>

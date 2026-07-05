@@ -161,7 +161,7 @@ export default function Settings() {
   const [isAppSettingsOpen, setIsAppSettingsOpen] = useState(false);
   const [isReordering, setIsReordering] = useState(false);
   const [editingItem, setEditingItem] = useState<any>(null);
-  
+
   const { user, logout } = useAuth();
   const { accounts, sources, categories, purposes, wishlists, billPurposes, refresh } = useData();
 
@@ -183,7 +183,7 @@ export default function Settings() {
 
   const handleSave = async (data: any, isEdit: boolean) => {
     if (!user) return false;
-    
+
     let table = '';
     let payload: any = { name: data.name, user_id: user.id };
 
@@ -213,10 +213,10 @@ export default function Settings() {
     }
 
     try {
-      const { error } = isEdit 
+      const { error } = isEdit
         ? await supabase.from(table).update(payload).eq('id', data.id)
         : await supabase.from(table).insert([payload]);
-        
+
       if (error) throw error;
       await refresh();
       toast.success('Data berhasil disimpan!');
@@ -249,19 +249,19 @@ export default function Settings() {
           .select('*', { count: 'exact', head: true })
           .is('deleted_at', null)
           .or(`from_account_id.eq.${id},to_account_id.eq.${id}`);
-        
+
         if (count && count > 0) {
           toast.error(`Tidak bisa hapus: Akun masih digunakan di ${count} transaksi`);
           return false;
         }
-      } 
+      }
       else if (activeTab === 'kategori') {
         const { count } = await supabase
           .from('transactions')
           .select('*', { count: 'exact', head: true })
           .is('deleted_at', null)
           .eq('category_id', id);
-        
+
         if (count && count > 0) {
           toast.error(`Tidak bisa hapus: Kategori masih digunakan di ${count} transaksi`);
           return false;
@@ -273,7 +273,7 @@ export default function Settings() {
           .select('*', { count: 'exact', head: true })
           .is('deleted_at', null)
           .eq('purpose_id', id);
-        
+
         if (count && count > 0) {
           toast.error(`Tidak bisa hapus: Tujuan masih digunakan di ${count} transaksi`);
           return false;
@@ -285,7 +285,7 @@ export default function Settings() {
           .select('*', { count: 'exact', head: true })
           .is('deleted_at', null)
           .eq('wishlist_id', id);
-        
+
         if (count && count > 0) {
           toast.error(`Tidak bisa hapus: Wishlist masih digunakan di ${count} transaksi tabungan`);
           return false;
@@ -297,7 +297,7 @@ export default function Settings() {
           .select('*', { count: 'exact', head: true })
           .is('deleted_at', null)
           .eq('source_id', id);
-        
+
         if (count && count > 0) {
           toast.error(`Tidak bisa hapus: Sumber masih digunakan di ${count} transaksi`);
           return false;
@@ -309,7 +309,7 @@ export default function Settings() {
           .select('*', { count: 'exact', head: true })
           .is('deleted_at', null)
           .eq('bill_purpose_id', id);
-        
+
         if (count && count > 0) {
           toast.error(`Tidak bisa hapus: Tagihan masih digunakan di ${count} transaksi`);
           return false;
@@ -335,15 +335,15 @@ export default function Settings() {
       <div className="bg-surface border-b border-line px-5 py-6 mb-2 flex items-center justify-between gap-4 md:rounded-b-3xl shadow-sm md:mx-6 md:border-x">
         <div className="flex items-center gap-4 min-w-0">
           <div className="w-14 h-14 rounded-full bg-accent/10 border-2 border-accent/20 flex items-center justify-center font-bold text-2xl text-accent overflow-hidden shadow-inner shrink-0">
-             {user?.user_metadata?.show_avatar !== false && user?.user_metadata?.avatar_url ? (
-               <img src={user.user_metadata.avatar_url} alt="Profile" className="w-full h-full object-cover" />
-             ) : (
-               (user?.user_metadata?.name || user?.user_metadata?.full_name || user?.email || 'U').charAt(0).toUpperCase()
-             )}
+            {user?.user_metadata?.show_avatar !== false && user?.user_metadata?.avatar_url ? (
+              <img src={user.user_metadata.avatar_url} alt="Profile" className="w-full h-full object-cover" />
+            ) : (
+              (user?.user_metadata?.name || user?.user_metadata?.full_name || user?.email || 'U').charAt(0).toUpperCase()
+            )}
           </div>
           <div className="min-w-0 flex-1">
-             <h2 className="text-lg font-bold text-text-primary tracking-tight truncate">{user?.user_metadata?.name || user?.user_metadata?.full_name || user?.email?.split('@')[0]}</h2>
-             <p className="text-[13px] text-text-muted bg-surface-alt px-2 py-0.5 rounded-full inline-flex font-medium mt-1 truncate max-w-full">{user?.email}</p>
+            <h2 className="text-lg font-bold text-text-primary tracking-tight truncate">{user?.user_metadata?.name || user?.user_metadata?.full_name || user?.email?.split('@')[0]}</h2>
+            <p className="text-[13px] text-text-muted bg-surface-alt px-2 py-0.5 rounded-full inline-flex font-medium mt-1 truncate max-w-full">{user?.email}</p>
           </div>
         </div>
         <button
@@ -421,52 +421,52 @@ export default function Settings() {
       </div>
 
       <div className="mt-2 min-h-[50vh]">
-         {activeTab === 'akun' && (
-           <Section
-             title="Akun / Wallet Finansial"
-             onAdd={isReordering ? undefined : () => { setEditingItem(null); setIsModalOpen(true); }}
-             headerAction={
-               accounts.length > 1 && (
-                 <button
-                   onClick={() => setIsReordering(!isReordering)}
-                   className={clsx(
-                     "text-[12px] font-semibold gap-1.5 px-3 py-1.5 rounded-full flex items-center transition-all active:scale-95",
-                     isReordering
-                       ? "bg-accent text-bg shadow-md shadow-accent/10 dark:shadow-accent/5 font-bold"
-                       : "bg-surface-alt hover:bg-surface-hover border border-line text-text-primary"
-                   )}
-                 >
-                   {isReordering ? (
-                     <>
-                       <Check className="w-3.5 h-3.5" /> Selesai
-                     </>
-                   ) : (
-                     <>
-                       <ArrowUpDown className="w-3.5 h-3.5 animate-pulse" /> Atur Urutan
-                     </>
-                   )}
-                 </button>
-               )
-             }
-           >
-             {accounts.map((a, idx) => (
-               <Item
-                 key={a.id}
-                 label={a.name}
-                 sub={`${typeLabel[a.type]} • Saldo awal ${fmt(Number(a.initial_balance ?? a.balance ?? 0))}`}
-                 trailing={fmt(Number(a.balance))}
-                 iconUrl={a.icon_url || undefined}
-                 onClick={() => { setEditingItem(a); setIsModalOpen(true); }}
-                 isReordering={isReordering}
-                 onMoveUp={() => handleMoveAccount(idx, 'up')}
-                 onMoveDown={() => handleMoveAccount(idx, 'down')}
-                 isFirst={idx === 0}
-                 isLast={idx === accounts.length - 1}
-               />
-             ))}
-             {accounts.length === 0 && <p className="text-center text-sm font-medium text-text-muted py-8">Belum ada akun diatur.</p>}
-           </Section>
-         )}
+        {activeTab === 'akun' && (
+          <Section
+            title="Akun / Wallet Finansial"
+            onAdd={isReordering ? undefined : () => { setEditingItem(null); setIsModalOpen(true); }}
+            headerAction={
+              accounts.length > 1 && (
+                <button
+                  onClick={() => setIsReordering(!isReordering)}
+                  className={clsx(
+                    "text-[12px] font-semibold gap-1.5 px-3 py-1.5 rounded-full flex items-center transition-all active:scale-95",
+                    isReordering
+                      ? "bg-accent text-bg shadow-md shadow-accent/10 dark:shadow-accent/5 font-bold"
+                      : "bg-surface-alt hover:bg-surface-hover border border-line text-text-primary"
+                  )}
+                >
+                  {isReordering ? (
+                    <>
+                      <Check className="w-3.5 h-3.5" /> Selesai
+                    </>
+                  ) : (
+                    <>
+                      <ArrowUpDown className="w-3.5 h-3.5 animate-pulse" /> Atur Urutan
+                    </>
+                  )}
+                </button>
+              )
+            }
+          >
+            {accounts.map((a, idx) => (
+              <Item
+                key={a.id}
+                label={a.name}
+                sub={`${typeLabel[a.type]} • Saldo awal ${fmt(Number(a.initial_balance ?? a.balance ?? 0))}`}
+                trailing={fmt(Number(a.balance))}
+                iconUrl={a.icon_url || undefined}
+                onClick={() => { setEditingItem(a); setIsModalOpen(true); }}
+                isReordering={isReordering}
+                onMoveUp={() => handleMoveAccount(idx, 'up')}
+                onMoveDown={() => handleMoveAccount(idx, 'down')}
+                isFirst={idx === 0}
+                isLast={idx === accounts.length - 1}
+              />
+            ))}
+            {accounts.length === 0 && <p className="text-center text-sm font-medium text-text-muted py-8">Belum ada akun diatur.</p>}
+          </Section>
+        )}
 
         {activeTab === 'sumber' && (
           <Section title="Sumber Penghasilan Anda" onAdd={() => { setEditingItem(null); setIsModalOpen(true); }}>
@@ -488,12 +488,12 @@ export default function Settings() {
               const IconComp = getPurposeIcon(p.icon);
               const colorClass = getCategoryColor(p.icon);
               return (
-                <Item 
-                  key={p.id} 
-                  label={p.name} 
+                <Item
+                  key={p.id}
+                  label={p.name}
                   iconComp={<IconComp className="w-5 h-5" />}
                   iconBg={colorClass}
-                  onClick={() => { setEditingItem(p); setIsModalOpen(true); }} 
+                  onClick={() => { setEditingItem(p); setIsModalOpen(true); }}
                 />
               );
             })}
@@ -503,7 +503,7 @@ export default function Settings() {
 
         {activeTab === 'wishlist' && (
           <Section title="Wishlist & Target Spesial" onAdd={() => { setEditingItem(null); setIsModalOpen(true); }}>
-            {wishlists.map(w => <Item key={w.id} label={w.name} sub={`Target: ${fmt(Number(w.target_amount))}`} trailing={fmt(Number(w.current_amount))} onClick={() => { setEditingItem({...w, targetAmount: w.target_amount, currentAmount: w.current_amount}); setIsModalOpen(true); }} />)}
+            {wishlists.map(w => <Item key={w.id} label={w.name} sub={`Target: ${fmt(Number(w.target_amount))}`} trailing={fmt(Number(w.current_amount))} onClick={() => { setEditingItem({ ...w, targetAmount: w.target_amount, currentAmount: w.current_amount }); setIsModalOpen(true); }} />)}
             {wishlists.length === 0 && <p className="text-center text-sm font-medium text-text-muted py-8">Belum ada target wishlist.</p>}
           </Section>
         )}
@@ -519,29 +519,29 @@ export default function Settings() {
 
       {/* Huge Action Bottom */}
       <div className="px-4 md:px-6 mt-6 mb-8 space-y-3">
-         <button 
-           onClick={() => setIsAppSettingsOpen(true)} 
-           className="w-full bg-accent/10 hover:bg-accent/20 text-accent border border-accent/20 hover:border-accent/40 transition-colors rounded-2xl py-4 flex items-center justify-center gap-2 font-bold text-[15px] active:scale-[0.98]"
-         >
-            <Sliders className="w-5 h-5" />
-            Pengaturan Aplikasi
-         </button>
+        <button
+          onClick={() => setIsAppSettingsOpen(true)}
+          className="w-full bg-accent/10 hover:bg-accent/20 text-accent border border-accent/20 hover:border-accent/40 transition-colors rounded-2xl py-4 flex items-center justify-center gap-2 font-bold text-[15px] active:scale-[0.98]"
+        >
+          <Sliders className="w-5 h-5" />
+          Pengaturan Aplikasi
+        </button>
 
-         <button 
-           onClick={logout} 
-           className="w-full bg-danger/10 hover:bg-danger/20 text-danger border border-danger/20 hover:border-danger/40 transition-colors rounded-2xl py-4 flex items-center justify-center gap-2 font-bold text-[15px] active:scale-[0.98]"
-         >
-            <LogOut className="w-5 h-5" />
-            Keluar Dari Akun
-         </button>
-         <p className="text-center text-[11px] text-text-muted mt-4 font-medium opacity-60">Koin Ku App Versi 2.0.0</p>
+        <button
+          onClick={logout}
+          className="w-full bg-danger/10 hover:bg-danger/20 text-danger border border-danger/20 hover:border-danger/40 transition-colors rounded-2xl py-4 flex items-center justify-center gap-2 font-bold text-[15px] active:scale-[0.98]"
+        >
+          <LogOut className="w-5 h-5" />
+          Keluar Dari Akun
+        </button>
+        <p className="text-center text-[11px] text-text-muted mt-4 font-medium opacity-60">Koin Ku App Versi 2.0.0</p>
       </div>
 
-      <SettingsModal 
-        isOpen={isModalOpen} 
-        onClose={() => { setIsModalOpen(false); setEditingItem(null); }} 
-        type={activeTab} 
-        onSave={handleSave} 
+      <SettingsModal
+        isOpen={isModalOpen}
+        onClose={() => { setIsModalOpen(false); setEditingItem(null); }}
+        type={activeTab}
+        onSave={handleSave}
         onDelete={handleDelete}
         initialData={editingItem}
       />
