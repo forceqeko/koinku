@@ -30,30 +30,32 @@ export default function WalletPage() {
   return (
     <div className="p-4 md:p-6 space-y-6">
       {/* Wallet Summary Card */}
-      <div className="card p-6 border-line bg-surface shadow-sm relative overflow-hidden">
+      <div className="card p-6 bg-accent border-accent text-white shadow-lg relative overflow-hidden">
         {/* Abstract background shapes */}
-        <div className="absolute right-0 top-0 w-32 h-32 bg-accent/5 rounded-full blur-2xl -mr-8 -mt-8"></div>
-        <div className="absolute left-1/3 bottom-0 w-24 h-24 bg-accent/5 rounded-full blur-xl -mb-6"></div>
+        <div className="absolute right-0 top-0 w-48 h-48 bg-white/10 rounded-full blur-2xl -mr-12 -mt-12 pointer-events-none"></div>
+        <div className="absolute left-1/4 bottom-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -ml-16 -mb-16 pointer-events-none"></div>
         
         <div className="relative z-10 space-y-4">
           <div className="flex justify-between items-center">
-            <span className="text-[10px] md:text-[11px] font-bold tracking-wider text-text-muted uppercase">Total Saldo Wallet</span>
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-6 rounded bg-white/20 border border-white/30 shrink-0"></div>
+              <span className="text-[10px] md:text-[11px] font-bold tracking-wider text-white/80 uppercase">Total Saldo Wallet</span>
+            </div>
             <button
               onClick={toggleBalance}
-              className="p-1.5 rounded-full bg-surface-alt/50 hover:bg-surface-alt transition-all"
+              className="p-1.5 rounded-full bg-white/10 hover:bg-white/20 transition-all text-white/90"
               aria-label={showBalance ? "Sembunyikan saldo" : "Tampilkan saldo"}
             >
-              {showBalance ? <EyeSlash size={16} className="text-text-muted" /> : <Eye size={16} className="text-text-muted" />}
+              {showBalance ? <EyeSlash size={16} /> : <Eye size={16} />}
             </button>
           </div>
           
-          <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight text-text-primary">
+          <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight text-white my-3">
             {showBalance ? fmt(totalBalance) : '••••••'}
           </h2>
           
-          <div className="flex items-center gap-2 pt-2 text-[11px] text-text-muted font-semibold">
-            <span className="bg-surface-alt px-2.5 py-1 rounded-full font-bold text-[10px] text-text-secondary">{accounts.length} Akun Terdaftar</span>
-            <span>•</span>
+          <div className="flex items-center justify-between pt-2 text-[11px] text-white/90 font-semibold">
+            <span className="bg-white/20 px-3 py-1 rounded-full font-bold text-[10px] text-white">{accounts.length} Akun Terdaftar</span>
             <span>IDR Currency</span>
           </div>
         </div>

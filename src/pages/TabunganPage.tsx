@@ -191,39 +191,43 @@ export default function TabunganPage() {
   return (
     <div className="p-4 md:p-6 space-y-6">
       {/* Target Tabungan Progress Summary */}
-      <div className="card p-6 border-line bg-surface shadow-sm relative overflow-hidden">
-        <div className="absolute right-0 top-0 w-32 h-32 bg-accent/5 rounded-full blur-2xl -mr-8 -mt-8"></div>
-        <div className="absolute left-1/4 bottom-0 w-24 h-24 bg-accent/5 rounded-full blur-xl -mb-6"></div>
+      <div className="card p-6 bg-accent border-accent text-white shadow-lg relative overflow-hidden">
+        {/* Abstract background shapes */}
+        <div className="absolute right-0 top-0 w-48 h-48 bg-white/10 rounded-full blur-2xl -mr-12 -mt-12 pointer-events-none"></div>
+        <div className="absolute left-1/4 bottom-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -ml-16 -mb-16 pointer-events-none"></div>
 
         <div className="relative z-10 space-y-4">
           <div className="flex justify-between items-center">
-            <span className="text-[10px] md:text-[11px] font-bold tracking-wider text-text-muted uppercase">Total Dana Terkumpul</span>
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-6 rounded bg-white/20 border border-white/30 shrink-0"></div>
+              <span className="text-[10px] md:text-[11px] font-bold tracking-wider text-white/80 uppercase">Total Dana Terkumpul</span>
+            </div>
             <button
               onClick={toggleBalance}
-              className="p-1.5 rounded-full bg-surface-alt/50 hover:bg-surface-alt transition-all"
+              className="p-1.5 rounded-full bg-white/10 hover:bg-white/20 transition-all text-white/90"
               aria-label={showBalance ? "Sembunyikan saldo" : "Tampilkan saldo"}
             >
-              {showBalance ? <EyeSlash size={16} className="text-text-muted" /> : <Eye size={16} className="text-text-muted" />}
+              {showBalance ? <EyeSlash size={16} /> : <Eye size={16} />}
             </button>
           </div>
 
-          <div className="flex justify-between items-end">
-            <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight text-text-primary">
+          <div className="flex justify-between items-center">
+            <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight text-white">
               {showBalance ? fmt(totalSaved) : '••••••'}
             </h2>
-            <span className="text-[11px] font-bold text-accent bg-accent/10 px-2.5 py-1 rounded-full uppercase tracking-wider">
+            <span className="text-[11px] font-bold text-white bg-white/20 px-3 py-1 rounded-full uppercase tracking-wider">
               {totalProgressPercent.toFixed(0)}% dari target
             </span>
           </div>
 
           <div className="space-y-1.5 pt-2">
-            <div className="bg-surface-alt rounded-full h-1.5 overflow-hidden">
+            <div className="bg-white/25 rounded-full h-1.5 overflow-hidden">
               <div
-                className="h-full bg-success rounded-full transition-all duration-700 ease-out"
+                className="h-full bg-white rounded-full transition-all duration-700 ease-out"
                 style={{ width: `${Math.min(100, totalProgressPercent)}%` }}
               />
             </div>
-            <div className="flex justify-between text-[11px] text-text-muted font-semibold">
+            <div className="flex justify-between text-[11px] text-white/90 font-semibold">
               <span>Target Total: {showBalance ? fmt(totalTarget) : '••••'}</span>
               <span>{activeWishlists.length} Tabungan Aktif</span>
             </div>

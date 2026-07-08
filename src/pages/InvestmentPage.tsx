@@ -149,59 +149,56 @@ export default function InvestmentPage() {
   return (
     <div className="p-4 md:p-6 pb-24 md:pb-6 space-y-6">
       {/* Premium Investment Summary Card */}
-      <div className="card p-6 border-line bg-surface shadow-sm relative overflow-hidden">
+      <div className="card p-6 bg-accent border-accent text-white shadow-lg relative overflow-hidden">
         {/* Decorative background shapes */}
-        <div className="absolute right-0 top-0 w-32 h-32 bg-accent/5 rounded-full blur-2xl -mr-8 -mt-8"></div>
-        <div className="absolute left-1/4 bottom-0 w-24 h-24 bg-accent/5 rounded-full blur-xl -mb-6"></div>
+        <div className="absolute right-0 top-0 w-48 h-48 bg-white/10 rounded-full blur-2xl -mr-12 -mt-12 pointer-events-none"></div>
+        <div className="absolute left-1/4 bottom-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -ml-16 -mb-16 pointer-events-none"></div>
         
         <div className="relative z-10 space-y-5">
           {/* Top Row: Label and Toggle Balance */}
           <div className="flex justify-between items-center">
-            <span className="text-[10px] md:text-[11px] font-bold tracking-wider text-text-muted uppercase">Total Nilai Pasar Investasi</span>
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-6 rounded bg-white/20 border border-white/30 shrink-0"></div>
+              <span className="text-[10px] md:text-[11px] font-bold tracking-wider text-white/80 uppercase">Total Nilai Pasar Investasi</span>
+            </div>
             <button
               onClick={toggleBalance}
-              className="p-1.5 rounded-full bg-surface-alt/50 hover:bg-surface-alt transition-all"
+              className="p-1.5 rounded-full bg-white/10 hover:bg-white/20 transition-all text-white/90"
               aria-label={showBalance ? "Sembunyikan saldo" : "Tampilkan saldo"}
             >
-              {showBalance ? <EyeSlash size={16} className="text-text-muted" /> : <Eye size={16} className="text-text-muted" />}
+              {showBalance ? <EyeSlash size={16} /> : <Eye size={16} />}
             </button>
           </div>
           
           {/* Middle Row: Main Large Balance and Return Badge */}
-          <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight text-accent">
+              <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight text-white">
                 {showBalance ? fmt(totalMarketValue) : '••••••'}
               </h2>
             </div>
             
             <div className="flex items-center gap-2">
-              <span className={clsx(
-                "text-[11px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1",
-                totalReturn >= 0 ? "bg-success/10 text-success" : "bg-danger/10 text-danger"
-              )}>
+              <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1 bg-white/20 text-white">
                 {totalReturn >= 0 ? '▲' : '▼'} {totalReturnPercent.toFixed(2)}%
               </span>
-              <span className={clsx(
-                "text-[12px] font-extrabold",
-                totalReturn >= 0 ? "text-success" : "text-danger"
-              )}>
+              <span className="text-[12px] font-extrabold text-white">
                 ({totalReturn >= 0 ? '+' : ''}{showBalance ? fmt(totalReturn) : '••••'})
               </span>
             </div>
           </div>
 
           {/* Bottom Divider */}
-          <div className="border-t border-line/60 pt-4 grid grid-cols-2 gap-4">
+          <div className="border-t border-white/25 pt-4 grid grid-cols-2 gap-4">
             <div>
-              <p className="text-[9px] font-bold text-text-muted uppercase tracking-wider">Total Modal</p>
-              <p className="text-[14px] font-extrabold text-text-primary mt-0.5">
+              <p className="text-[9px] font-bold text-white/80 uppercase tracking-wider">Total Modal</p>
+              <p className="text-[14px] font-extrabold text-white mt-0.5">
                 {showBalance ? fmt(totalCapital) : '••••••'}
               </p>
             </div>
             <div>
-              <p className="text-[9px] font-bold text-text-muted uppercase tracking-wider">Jumlah Portofolio</p>
-              <p className="text-[14px] font-extrabold text-text-primary mt-0.5">
+              <p className="text-[9px] font-bold text-white/80 uppercase tracking-wider">Jumlah Portofolio</p>
+              <p className="text-[14px] font-extrabold text-white mt-0.5">
                 {activePortfolios.length} Aktif
               </p>
             </div>

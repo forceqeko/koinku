@@ -179,47 +179,52 @@ export default function HutangPage() {
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         {/* Summary Card Hutang */}
-        <div className="card p-6 border-line bg-surface shadow-sm relative overflow-hidden flex flex-col justify-between">
-          <div className="absolute right-0 top-0 w-32 h-32 bg-red-500/5 rounded-full blur-2xl -mr-8 -mt-8"></div>
+        <div className="card p-6 bg-danger border-danger text-white shadow-lg relative overflow-hidden flex flex-col justify-between">
+          <div className="absolute right-0 top-0 w-48 h-48 bg-white/10 rounded-full blur-2xl -mr-12 -mt-12 pointer-events-none"></div>
+          <div className="absolute left-1/4 bottom-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -ml-16 -mb-16 pointer-events-none"></div>
+          
           <div className="relative z-10 space-y-4">
             <div className="flex justify-between items-center">
-              <span className="text-[10px] md:text-[11px] font-bold tracking-wider text-text-muted uppercase">Total Sisa Hutang Aktif</span>
-              <span className="px-2 py-0.5 text-[9px] rounded-md bg-red-500/10 border border-red-500/20 text-red-500 font-bold uppercase tracking-wider">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-6 rounded bg-white/20 border border-white/30 shrink-0"></div>
+                <span className="text-[10px] md:text-[11px] font-bold tracking-wider text-white/80 uppercase">Total Sisa Hutang</span>
+              </div>
+              <span className="px-2.5 py-1 text-[9px] rounded-full bg-white/20 text-white font-bold uppercase tracking-wider">
                 {stats.countHutangAktif} Rekor Aktif
               </span>
             </div>
 
             <div className="flex justify-between items-start">
               <div>
-                <h2 className="text-3xl font-extrabold tracking-tight text-red-500">
+                <h2 className="text-3xl font-extrabold tracking-tight text-white">
                   Rp {stats.totalHutangAktif.toLocaleString('id-ID')}
                 </h2>
-                <p className="text-[10px] text-text-muted mt-1">
-                  Total Tagihan (Pokok + Bunga): <span className="font-bold text-text-primary">Rp {(stats.totalHutangPokok + stats.totalHutangBunga).toLocaleString('id-ID')}</span>
+                <p className="text-[10px] text-white/85 mt-1">
+                  Total Tagihan (Pokok + Bunga): <span className="font-extrabold text-white">Rp {(stats.totalHutangPokok + stats.totalHutangBunga).toLocaleString('id-ID')}</span>
                 </p>
               </div>
-              <div className="p-2 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 hidden sm:block shrink-0">
+              <div className="p-2 rounded-xl bg-white/15 border border-white/25 text-white hidden sm:block shrink-0">
                 <ArrowDownLeft className="w-5 h-5" />
               </div>
             </div>
 
             {/* Detailed Breakdown */}
-            <div className="border-t border-line/65 pt-4 grid grid-cols-3 gap-2 text-center text-[11px]">
+            <div className="border-t border-white/25 pt-4 grid grid-cols-3 gap-2 text-center text-[11px]">
               <div>
-                <p className="text-[9px] font-bold text-text-muted uppercase">Pokok Pinjaman</p>
-                <p className="font-extrabold text-text-primary mt-0.5">
+                <p className="text-[9px] font-bold text-white/80 uppercase">Pokok Pinjaman</p>
+                <p className="font-extrabold text-white mt-0.5">
                   Rp {stats.totalHutangPokok.toLocaleString('id-ID')}
                 </p>
               </div>
               <div>
-                <p className="text-[9px] font-bold text-yellow-600 dark:text-yellow-400 uppercase">Bunga Berjalan</p>
-                <p className="font-extrabold text-yellow-600 dark:text-yellow-400 mt-0.5">
+                <p className="text-[9px] font-bold text-orange-200 uppercase">Bunga Berjalan</p>
+                <p className="font-extrabold text-orange-200 mt-0.5">
                   + Rp {stats.totalHutangBunga.toLocaleString('id-ID')}
                 </p>
               </div>
               <div>
-                <p className="text-[9px] font-bold text-emerald-500 uppercase">Sudah Dicicil</p>
-                <p className="font-extrabold text-emerald-500 mt-0.5">
+                <p className="text-[9px] font-bold text-green-200 uppercase">Sudah Dicicil</p>
+                <p className="font-extrabold text-green-200 mt-0.5">
                   - Rp {stats.totalHutangTerbayar.toLocaleString('id-ID')}
                 </p>
               </div>
@@ -228,47 +233,52 @@ export default function HutangPage() {
         </div>
 
         {/* Summary Card Piutang */}
-        <div className="card p-6 border-line bg-surface shadow-sm relative overflow-hidden flex flex-col justify-between">
-          <div className="absolute right-0 top-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-2xl -mr-8 -mt-8"></div>
+        <div className="card p-6 bg-success border-success text-white shadow-lg relative overflow-hidden flex flex-col justify-between">
+          <div className="absolute right-0 top-0 w-48 h-48 bg-white/10 rounded-full blur-2xl -mr-12 -mt-12 pointer-events-none"></div>
+          <div className="absolute left-1/4 bottom-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -ml-16 -mb-16 pointer-events-none"></div>
+          
           <div className="relative z-10 space-y-4">
             <div className="flex justify-between items-center">
-              <span className="text-[10px] md:text-[11px] font-bold tracking-wider text-text-muted uppercase">Total Sisa Piutang Aktif</span>
-              <span className="px-2 py-0.5 text-[9px] rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 font-bold uppercase tracking-wider">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-6 rounded bg-white/20 border border-white/30 shrink-0"></div>
+                <span className="text-[10px] md:text-[11px] font-bold tracking-wider text-white/80 uppercase">Total Sisa Piutang</span>
+              </div>
+              <span className="px-2.5 py-1 text-[9px] rounded-full bg-white/20 text-white font-bold uppercase tracking-wider">
                 {stats.countPiutangAktif} Rekor Aktif
               </span>
             </div>
 
             <div className="flex justify-between items-start">
               <div>
-                <h2 className="text-3xl font-extrabold tracking-tight text-emerald-500">
+                <h2 className="text-3xl font-extrabold tracking-tight text-white">
                   Rp {stats.totalPiutangAktif.toLocaleString('id-ID')}
                 </h2>
-                <p className="text-[10px] text-text-muted mt-1">
-                  Total Piutang (Pokok + Bunga): <span className="font-bold text-text-primary">Rp {(stats.totalPiutangPokok + stats.totalPiutangBunga).toLocaleString('id-ID')}</span>
+                <p className="text-[10px] text-white/85 mt-1">
+                  Total Piutang (Pokok + Bunga): <span className="font-extrabold text-white">Rp {(stats.totalPiutangPokok + stats.totalPiutangBunga).toLocaleString('id-ID')}</span>
                 </p>
               </div>
-              <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 hidden sm:block shrink-0">
+              <div className="p-2 rounded-xl bg-white/15 border border-white/25 text-white hidden sm:block shrink-0">
                 <ArrowUpRight className="w-5 h-5" />
               </div>
             </div>
 
             {/* Detailed Breakdown */}
-            <div className="border-t border-line/65 pt-4 grid grid-cols-3 gap-2 text-center text-[11px]">
+            <div className="border-t border-white/25 pt-4 grid grid-cols-3 gap-2 text-center text-[11px]">
               <div>
-                <p className="text-[9px] font-bold text-text-muted uppercase">Pokok Pinjaman</p>
-                <p className="font-extrabold text-text-primary mt-0.5">
+                <p className="text-[9px] font-bold text-white/80 uppercase">Pokok Pinjaman</p>
+                <p className="font-extrabold text-white mt-0.5">
                   Rp {stats.totalPiutangPokok.toLocaleString('id-ID')}
                 </p>
               </div>
               <div>
-                <p className="text-[9px] font-bold text-yellow-600 dark:text-yellow-400 uppercase">Bunga Berjalan</p>
-                <p className="font-extrabold text-yellow-600 dark:text-yellow-400 mt-0.5">
+                <p className="text-[9px] font-bold text-yellow-100 uppercase">Bunga Berjalan</p>
+                <p className="font-extrabold text-yellow-100 mt-0.5">
                   + Rp {stats.totalPiutangBunga.toLocaleString('id-ID')}
                 </p>
               </div>
               <div>
-                <p className="text-[9px] font-bold text-emerald-500 uppercase">Sudah Diterima</p>
-                <p className="font-extrabold text-emerald-500 mt-0.5">
+                <p className="text-[9px] font-bold text-blue-100 uppercase">Sudah Diterima</p>
+                <p className="font-extrabold text-blue-100 mt-0.5">
                   - Rp {stats.totalPiutangTerbayar.toLocaleString('id-ID')}
                 </p>
               </div>
